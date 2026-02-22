@@ -1,7 +1,12 @@
-[gd_scene load_steps=5 format=3 uid="uid://main_scene"]
+[gd_scene load_steps=8 format=3 uid="uid://main_scene"]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
 [ext_resource type="PackedScene" path="res://assets/models/characters/Knight.glb" id="2_knight"]
+[ext_resource type="Script" path="res://scripts/camera_follow.gd" id="3_camera"]
+[ext_resource type="PackedScene" path="res://assets/models/environment/house_001.fbx" id="4_house"]
+[ext_resource type="Script" path="res://scripts/apply_material.gd" id="5_apply_mat"]
+[ext_resource type="Material" path="res://assets/materials/ITHappy.tres" id="6_ithappy"]
+[ext_resource type="Script" path="res://scripts/nav_region.gd" id="7_nav_region"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
 size = Vector2(20, 20)
@@ -12,22 +17,50 @@ size = Vector2(20, 20)
 radius = 0.3
 height = 1.0
 
+[sub_resource type="BoxShape3D" id="BoxShape_house"]
+size = Vector3(3.5, 4.5, 4.0)
+
+[sub_resource type="NavigationMesh" id="NavMesh_main"]
+geometry_parsed_geometry_type = 2
+cell_size = 0.25
+cell_height = 0.25
+agent_height = 1.5
+agent_radius = 0.5
+agent_max_climb = 0.3
+agent_max_slope = 45.0
+
 [node name="Main" type="Node3D"]
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 10, 10)
+script = ExtResource("3_camera")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 8, 4)
 shadow_enabled = true
 
-[node name="Ground" type="StaticBody3D" parent="."]
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+navigation_mesh = SubResource("NavMesh_main")
+script = ExtResource("7_nav_region")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+[node name="Ground" type="StaticBody3D" parent="NavigationRegion3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="NavigationRegion3D/Ground"]
 mesh = SubResource("PlaneMesh_ground")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Ground"]
 shape = SubResource("WorldBoundary_ground")
+
+[node name="House" parent="NavigationRegion3D" instance=ExtResource("4_house")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -3)
+script = ExtResource("5_apply_mat")
+material = ExtResource("6_ithappy")
+
+[node name="HouseCollision" type="StaticBody3D" parent="NavigationRegion3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 2.1, -3)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/HouseCollision"]
+shape = SubResource("BoxShape_house")
 
 [node name="Player" type="CharacterBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
@@ -38,3 +71,7 @@ script = ExtResource("1_player")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 shape = SubResource("CapsuleShape_player")
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="Player"]
+path_desired_distance = 0.5
+target_desired_distance = 0.3
