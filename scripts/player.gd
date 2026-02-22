@@ -2,15 +2,18 @@ extends CharacterBody3D
 
 const SPEED := 5.0
 const ARRIVAL_THRESHOLD := 0.5
+const INTERACT_DISTANCE := 1.5
 
 enum State { IDLE, WALK }
 
 var _state: State = State.IDLE
 var _anim_player: AnimationPlayer
 var _target: Vector3
+var _selected_item: Node3D
 
 @onready var _camera: Camera3D = get_viewport().get_camera_3d()
 @onready var _nav_agent: NavigationAgent3D = $NavigationAgent3D
+@onready var _dialog: PanelContainer = $CanvasLayer/DialogUI
 
 
 func _ready() -> void:
@@ -34,6 +37,24 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var from := _camera.project_ray_origin(event.position)
 		var dir := _camera.project_ray_normal(event.position)
+
+		# Raycast to check if we clicked on an item
+		var space := get_world_3d().direct_space_state
+		var ray := PhysicsRayQueryParameters3D.create(from, from + dir * 100.0)
+		ray.collide_with_areas = true
+		var result := space.intersect_ray(ray)
+
+		# Hide dialog and unhighlight previously selected item
+		_hide_dialog()
+		if _selected_item and _selected_item.has_method("unhighlight"):
+			_selected_item.unhighlight()
+			_selected_item = null
+
+		if result and _find_pickup(result.collider):
+			var pickup := _find_pickup(result.collider)
+			if pickup.has_method("highlight"):
+				pickup.highlight()
+				_selected_item = pickup
 
 		# Intersect ray with the XZ plane (y = 0)
 		if dir.y != 0.0:
@@ -62,6 +83,15 @@ func _process_walk() -> void:
 	var to_target := _target - global_position
 	to_target.y = 0.0
 
+	# Check if we reached a highlighted item
+	if _selected_item:
+		var dist_to_item := (_selected_item.global_position - global_position)
+		dist_to_item.y = 0.0
+		if dist_to_item.length() < INTERACT_DISTANCE:
+			_show_dialog(_selected_item.item_name)
+			_state = State.IDLE
+			return
+
 	if to_target.length() < ARRIVAL_THRESHOLD:
 		_state = State.IDLE
 		return
@@ -82,6 +112,25 @@ func _process_walk() -> void:
 
 	_play_animation("walk")
 	move_and_slide()
+
+
+func _show_dialog(text: String) -> void:
+	_dialog.get_node("Label").text = text
+	_dialog.visible = true
+
+
+func _hide_dialog() -> void:
+	_dialog.visible = false
+
+
+func _find_pickup(node: Node) -> Node3D:
+	# Walk up the tree to find a node with item_pickup.gd script
+	var current := node
+	while current:
+		if current.has_method("highlight"):
+			return current as Node3D
+		current = current.get_parent()
+	return null
 
 
 func _find_animation_player(node: Node) -> AnimationPlayer:
