@@ -1,13 +1,16 @@
 extends CharacterBody3D
 
 const SPEED := 5.0
-const ARRIVAL_THRESHOLD := 0.2
+const ARRIVAL_THRESHOLD := 0.5
 
-var _target_position: Vector3
-var _has_target := false
+enum State { IDLE, WALK }
+
+var _state: State = State.IDLE
 var _anim_player: AnimationPlayer
+var _target: Vector3
 
 @onready var _camera: Camera3D = get_viewport().get_camera_3d()
+@onready var _nav_agent: NavigationAgent3D = $NavigationAgent3D
 
 
 func _ready() -> void:
@@ -36,30 +39,42 @@ func _input(event: InputEvent) -> void:
 		if dir.y != 0.0:
 			var t := -from.y / dir.y
 			if t > 0.0:
-				_target_position = from + dir * t
-				_target_position.y = global_position.y
-				_has_target = true
+				var target := from + dir * t
+				target.y = global_position.y
+				var nav_map := get_world_3d().navigation_map
+				var closest := NavigationServer3D.map_get_closest_point(nav_map, target)
+				_nav_agent.target_position = closest
+				_target = target
+				_state = State.WALK
 
 
 func _physics_process(_delta: float) -> void:
-	if not _has_target:
-		velocity = Vector3.ZERO
-		_play_animation("idle")
-		move_and_slide()
-		return
+	match _state:
+		State.IDLE:
+			velocity = Vector3.ZERO
+			_play_animation("idle")
+			move_and_slide()
+		State.WALK:
+			_process_walk()
 
-	var to_target := _target_position - global_position
+
+func _process_walk() -> void:
+	var to_target := _target - global_position
 	to_target.y = 0.0
-	var distance := to_target.length()
 
-	if distance < ARRIVAL_THRESHOLD:
-		_has_target = false
-		velocity = Vector3.ZERO
-		_play_animation("idle")
-		move_and_slide()
+	if to_target.length() < ARRIVAL_THRESHOLD:
+		_state = State.IDLE
 		return
 
-	var direction := to_target.normalized()
+	var next_point := _nav_agent.get_next_path_position()
+	var direction := (next_point - global_position)
+	direction.y = 0.0
+
+	if direction.length() < 0.01:
+		_state = State.IDLE
+		return
+
+	direction = direction.normalized()
 	velocity = direction * SPEED
 
 	# Rotate to face movement direction (KayKit models face +Z, look_at faces -Z)
