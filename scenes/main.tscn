@@ -5,8 +5,11 @@
 [ext_resource type="Script" path="res://scripts/camera_follow.gd" id="3_camera"]
 [ext_resource type="PackedScene" path="res://assets/models/environment/house_001.fbx" id="4_house"]
 [ext_resource type="Script" path="res://scripts/apply_material.gd" id="5_apply_mat"]
+[ext_resource type="Script" path="res://scripts/item_pickup.gd" id="10_item_pickup"]
 [ext_resource type="Material" path="res://assets/materials/ITHappy.tres" id="6_ithappy"]
 [ext_resource type="Script" path="res://scripts/nav_region.gd" id="7_nav_region"]
+[ext_resource type="PackedScene" path="res://assets/models/weapons/sword_1handed.gltf" id="8_sword"]
+[ext_resource type="Material" path="res://assets/materials/knight.tres" id="9_knight_mat"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
 size = Vector2(20, 20)
@@ -19,6 +22,9 @@ height = 1.0
 
 [sub_resource type="BoxShape3D" id="BoxShape_house"]
 size = Vector3(3.5, 4.5, 4.0)
+
+[sub_resource type="BoxShape3D" id="BoxShape_sword"]
+size = Vector3(0.6, 1.5, 0.2)
 
 [sub_resource type="NavigationMesh" id="NavMesh_main"]
 geometry_parsed_geometry_type = 2
@@ -62,6 +68,18 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 2.1, -3)
 [node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/HouseCollision"]
 shape = SubResource("BoxShape_house")
 
+[node name="SwordPickup" parent="." instance=ExtResource("8_sword")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.5, 2)
+script = ExtResource("10_item_pickup")
+material = ExtResource("9_knight_mat")
+item_name = "SWORD"
+
+[node name="ClickArea" type="Area3D" parent="SwordPickup"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SwordPickup/ClickArea"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("BoxShape_sword")
+
 [node name="Player" type="CharacterBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 script = ExtResource("1_player")
@@ -75,3 +93,24 @@ shape = SubResource("CapsuleShape_player")
 [node name="NavigationAgent3D" type="NavigationAgent3D" parent="Player"]
 path_desired_distance = 0.5
 target_desired_distance = 0.3
+
+[node name="CanvasLayer" type="CanvasLayer" parent="Player"]
+
+[node name="DialogUI" type="PanelContainer" parent="Player/CanvasLayer"]
+visible = false
+anchors_preset = 5
+anchor_left = 0.5
+anchor_top = 0.0
+anchor_right = 0.5
+anchor_bottom = 0.0
+offset_left = -100.0
+offset_top = 40.0
+offset_right = 100.0
+offset_bottom = 80.0
+grow_horizontal = 2
+grow_vertical = 1
+
+[node name="Label" type="Label" parent="Player/CanvasLayer/DialogUI"]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
