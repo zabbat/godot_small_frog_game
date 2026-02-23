@@ -175,8 +175,8 @@ func _create_grass_material() -> ShaderMaterial:
 	mat.set_shader_parameter("grass_roughness", 0.5)
 	mat.set_shader_parameter("color_scale", 0.18)
 	mat.set_shader_parameter("color_grad_height", -0.87)
-	mat.set_shader_parameter("top_color", Color(0.3, 0.7, 0.2))
-	mat.set_shader_parameter("bot_color", Color(0.1, 0.3, 0.05))
+	mat.set_shader_parameter("top_color", Color(0.45, 0.8, 0.15))
+	mat.set_shader_parameter("bot_color", Color(0.15, 0.35, 0.05))
 
 	return mat
 
