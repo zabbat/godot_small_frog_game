@@ -1,5 +1,4 @@
 extends NavigationRegion3D
 
 
-func _ready() -> void:
-	bake_navigation_mesh.call_deferred()
+# Baking is handled by map_loader.gd after objects are spawned

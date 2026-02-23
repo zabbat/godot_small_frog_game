@@ -1,17 +1,19 @@
-[gd_scene load_steps=8 format=3 uid="uid://main_scene"]
+[gd_scene format=3 uid="uid://bewyuuskm48jk"]
 
-[ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
-[ext_resource type="PackedScene" path="res://assets/models/characters/Knight.glb" id="2_knight"]
-[ext_resource type="Script" path="res://scripts/camera_follow.gd" id="3_camera"]
-[ext_resource type="PackedScene" path="res://assets/models/environment/house_001.fbx" id="4_house"]
-[ext_resource type="Script" path="res://scripts/apply_material.gd" id="5_apply_mat"]
-[ext_resource type="Script" path="res://scripts/item_pickup.gd" id="10_item_pickup"]
-[ext_resource type="Material" path="res://assets/materials/ITHappy.tres" id="6_ithappy"]
-[ext_resource type="Script" path="res://scripts/nav_region.gd" id="7_nav_region"]
-[ext_resource type="PackedScene" path="res://assets/models/weapons/sword_1handed.gltf" id="8_sword"]
-[ext_resource type="Material" path="res://assets/materials/knight.tres" id="9_knight_mat"]
+[ext_resource type="Script" uid="uid://crcpl5t7tjky7" path="res://scripts/player.gd" id="1_player"]
+[ext_resource type="PackedScene" uid="uid://c2sb3prj14spd" path="res://assets/models/characters/Knight.glb" id="2_knight"]
+[ext_resource type="Script" uid="uid://cm0bj8ykargi" path="res://scripts/camera_follow.gd" id="3_camera"]
+[ext_resource type="Script" uid="uid://uw5lajyv4jv8" path="res://scripts/map_loader.gd" id="4_map_loader"]
+[ext_resource type="Script" uid="uid://3xg27grr5ytp" path="res://scripts/nav_region.gd" id="7_nav_region"]
+
+[sub_resource type="NavigationMesh" id="NavMesh_main"]
+agent_max_climb = 0.3
+
+[sub_resource type="StandardMaterial3D" id="GreenGround_mat"]
+albedo_color = Color(0.15, 0.35, 0.08, 1)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
+material = SubResource("GreenGround_mat")
 size = Vector2(20, 20)
 
 [sub_resource type="WorldBoundaryShape3D" id="WorldBoundary_ground"]
@@ -20,97 +22,55 @@ size = Vector2(20, 20)
 radius = 0.3
 height = 1.0
 
-[sub_resource type="BoxShape3D" id="BoxShape_house"]
-size = Vector3(3.5, 4.5, 4.0)
+[node name="Main" type="Node3D" unique_id=1611800889]
+script = ExtResource("4_map_loader")
 
-[sub_resource type="BoxShape3D" id="BoxShape_sword"]
-size = Vector3(0.6, 1.5, 0.2)
-
-[sub_resource type="NavigationMesh" id="NavMesh_main"]
-geometry_parsed_geometry_type = 2
-cell_size = 0.25
-cell_height = 0.25
-agent_height = 1.5
-agent_radius = 0.5
-agent_max_climb = 0.3
-agent_max_slope = 45.0
-
-[node name="Main" type="Node3D"]
-
-[node name="Camera3D" type="Camera3D" parent="."]
+[node name="Camera3D" type="Camera3D" parent="." unique_id=699388003]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 10, 10)
 script = ExtResource("3_camera")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 8, 4)
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=997797976]
+transform = Transform3D(1, 0, 0, 0, 0.34202, 0.93969, 0, -0.93969, 0.34202, 0, 8, 2)
 shadow_enabled = true
 
-[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=1245631258]
 navigation_mesh = SubResource("NavMesh_main")
 script = ExtResource("7_nav_region")
 
-[node name="Ground" type="StaticBody3D" parent="NavigationRegion3D"]
+[node name="Ground" type="StaticBody3D" parent="NavigationRegion3D" unique_id=299080671]
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="NavigationRegion3D/Ground"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="NavigationRegion3D/Ground" unique_id=230641953]
 mesh = SubResource("PlaneMesh_ground")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Ground"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Ground" unique_id=1077195042]
 shape = SubResource("WorldBoundary_ground")
 
-[node name="House" parent="NavigationRegion3D" instance=ExtResource("4_house")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -3)
-script = ExtResource("5_apply_mat")
-material = ExtResource("6_ithappy")
-
-[node name="HouseCollision" type="StaticBody3D" parent="NavigationRegion3D"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 2.1, -3)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/HouseCollision"]
-shape = SubResource("BoxShape_house")
-
-[node name="SwordPickup" parent="." instance=ExtResource("8_sword")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.5, 2)
-script = ExtResource("10_item_pickup")
-material = ExtResource("9_knight_mat")
-item_name = "SWORD"
-
-[node name="ClickArea" type="Area3D" parent="SwordPickup"]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="SwordPickup/ClickArea"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
-shape = SubResource("BoxShape_sword")
-
-[node name="Player" type="CharacterBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+[node name="Player" type="CharacterBody3D" parent="." unique_id=449314854]
 script = ExtResource("1_player")
 
-[node name="KnightModel" parent="Player" instance=ExtResource("2_knight")]
+[node name="KnightModel" parent="Player" unique_id=1429852457 instance=ExtResource("2_knight")]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player" unique_id=1023692013]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 shape = SubResource("CapsuleShape_player")
 
-[node name="NavigationAgent3D" type="NavigationAgent3D" parent="Player"]
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="Player" unique_id=48375497]
 path_desired_distance = 0.5
 target_desired_distance = 0.3
 
-[node name="CanvasLayer" type="CanvasLayer" parent="Player"]
+[node name="CanvasLayer" type="CanvasLayer" parent="Player" unique_id=423062934]
 
-[node name="DialogUI" type="PanelContainer" parent="Player/CanvasLayer"]
+[node name="DialogUI" type="PanelContainer" parent="Player/CanvasLayer" unique_id=721359776]
 visible = false
-anchors_preset = 5
-anchor_left = 0.5
-anchor_top = 0.0
-anchor_right = 0.5
-anchor_bottom = 0.0
-offset_left = -100.0
-offset_top = 40.0
-offset_right = 100.0
-offset_bottom = 80.0
+anchors_preset = -1
+anchor_left = 0.45
+anchor_top = 0.35
+anchor_right = 0.55
+anchor_bottom = 0.4
 grow_horizontal = 2
-grow_vertical = 1
+grow_vertical = 0
 
-[node name="Label" type="Label" parent="Player/CanvasLayer/DialogUI"]
+[node name="Label" type="Label" parent="Player/CanvasLayer/DialogUI" unique_id=1700182703]
 layout_mode = 2
 horizontal_alignment = 1
 vertical_alignment = 1
