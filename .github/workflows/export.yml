@@ -7,6 +7,7 @@ on:
 
 env:
   GODOT_VERSION: "4.6"
+  TEMPLATES_DIR: /github/home/.local/share/godot/export_templates/4.6.stable
 
 jobs:
   export-windows:
@@ -19,8 +20,11 @@ jobs:
 
       - name: Setup export templates
         run: |
-          mkdir -p /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable
-          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable 2>/dev/null || true
+          mkdir -p "$TEMPLATES_DIR"
+          # Copy templates from wherever the image stores them
+          cp /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/* "$TEMPLATES_DIR/" 2>/dev/null || true
+          # List templates for debugging
+          ls -la "$TEMPLATES_DIR/" || echo "No templates found"
 
       - name: Import project
         run: godot --headless --import 2>&1 || true
@@ -50,8 +54,9 @@ jobs:
 
       - name: Setup export templates
         run: |
-          mkdir -p /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable
-          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable 2>/dev/null || true
+          mkdir -p "$TEMPLATES_DIR"
+          cp /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/* "$TEMPLATES_DIR/" 2>/dev/null || true
+          ls -la "$TEMPLATES_DIR/" || echo "No templates found"
 
       - name: Import project
         run: godot --headless --import 2>&1 || true
