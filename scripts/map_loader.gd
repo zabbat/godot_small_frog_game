@@ -15,6 +15,12 @@ var _cell_size := 0.0
 
 func _ready() -> void:
 	_registry.load(registry_path)
+	load_map(map_path)
+
+
+func load_map(path: String) -> void:
+	map_path = path
+	_clear_spawned()
 	var map_data := _parse_map_file(map_path)
 
 	_apply_ground_shader(map_data.layers.get("ground", []), map_data.legends.get("ground", {}))
@@ -23,6 +29,22 @@ func _ready() -> void:
 	_spawn_items(map_data.items)
 
 	_nav_region.bake_navigation_mesh.call_deferred()
+
+
+func _clear_spawned() -> void:
+	# Remove dynamically spawned children (keep static scene nodes)
+	for child in get_children():
+		if child is Camera3D or child is DirectionalLight3D or child is NavigationRegion3D or child is CharacterBody3D:
+			continue
+		remove_child(child)
+		child.queue_free()
+
+	# Remove spawned objects/portals from nav region (keep Ground)
+	for child in _nav_region.get_children():
+		if child.name == "Ground":
+			continue
+		_nav_region.remove_child(child)
+		child.queue_free()
 
 
 func _parse_map_file(path: String) -> Dictionary:
@@ -89,7 +111,7 @@ func _parse_item_line(line: String) -> Dictionary:
 	return {"name": name_part, "position": pos, "model_id": model_part}
 
 
-func _grid_to_world(col: int, row: int) -> Vector3:
+func grid_to_world(col: int, row: int) -> Vector3:
 	var half := ground_size / 2.0
 	var x := col * _cell_size - half + _cell_size / 2.0
 	var z := row * _cell_size - half + _cell_size / 2.0
@@ -142,7 +164,7 @@ func _spawn_grass(grid: Array, legend: Dictionary) -> void:
 			var tile_type: String = legend.get(ch, "none")
 			if tile_type != "grass_3d":
 				continue
-			var world_pos := _grid_to_world(col_idx, row_idx)
+			var world_pos := grid_to_world(col_idx, row_idx)
 			var patch := MultiMeshInstance3D.new()
 			patch.set_script(grass_script)
 			patch.patch_size = Vector2(_cell_size, _cell_size)
@@ -183,6 +205,34 @@ func _create_grass_material() -> ShaderMaterial:
 
 # --- Objects layer ---
 
+func _parse_object_legend(value_str: String) -> Dictionary:
+	var result := {"model_id": "", "rotation": 0.0, "portal": {}}
+
+	var paren_start := value_str.find("(")
+	var before_paren := value_str
+	if paren_start != -1:
+		before_paren = value_str.substr(0, paren_start)
+		var paren_end := value_str.find(")", paren_start)
+		if paren_end != -1:
+			var portal_str := value_str.substr(paren_start + 1, paren_end - paren_start - 1)
+			var parts := portal_str.split(",")
+			if parts.size() >= 5:
+				result.portal = {
+					"action": parts[0].strip_edges(),
+					"map_path": parts[1].strip_edges(),
+					"spawn_x": float(parts[2].strip_edges()),
+					"spawn_z": float(parts[3].strip_edges()),
+					"spawn_rotation": float(parts[4].strip_edges()),
+				}
+
+	var value_parts := before_paren.split(",")
+	result.model_id = value_parts[0].strip_edges()
+	if value_parts.size() > 1 and value_parts[1].strip_edges() != "":
+		result.rotation = float(value_parts[1].strip_edges())
+
+	return result
+
+
 func _spawn_objects(grid: Array, legend: Dictionary) -> void:
 	for row_idx in grid.size():
 		var row_str: String = grid[row_idx]
@@ -194,18 +244,19 @@ func _spawn_objects(grid: Array, legend: Dictionary) -> void:
 				push_warning("Map: unknown object character '%s'" % ch)
 				continue
 
-			var value_str: String = legend[ch]
-			var value_parts := value_str.split(",")
-			var model_id := value_parts[0].strip_edges()
-			var rotation_deg := 0.0
-			if value_parts.size() > 1:
-				rotation_deg = float(value_parts[1].strip_edges())
-
-			var world_pos := _grid_to_world(col_idx, row_idx)
-			_spawn_object(model_id, world_pos, rotation_deg)
+			var parsed := _parse_object_legend(legend[ch])
+			var world_pos := grid_to_world(col_idx, row_idx)
+			_spawn_object(parsed.model_id, world_pos, parsed.rotation, parsed.portal)
 
 
-func _spawn_object(model_id: String, world_pos: Vector3, rotation_deg := 0.0) -> void:
+func _spawn_object(model_id: String, world_pos: Vector3, rotation_deg := 0.0, portal := {}) -> void:
+	# Invisible portal tile — no model, just the trigger
+	if model_id == "none":
+		if not portal.is_empty() and portal.action == "TOUCH":
+			var tile_size := Vector3(_cell_size, 1.0, _cell_size)
+			_spawn_portal_trigger(world_pos, tile_size, 0.0, portal)
+		return
+
 	if not _registry.has_section(model_id):
 		push_warning("Registry: unknown model '%s'" % model_id)
 		return
@@ -245,8 +296,35 @@ func _spawn_object(model_id: String, world_pos: Vector3, rotation_deg := 0.0) ->
 
 		static_body.add_child(collision_shape)
 		_nav_region.add_child(static_body)
+
+		if not portal.is_empty() and portal.action == "TOUCH":
+			_spawn_portal_trigger(world_pos, collision_size, collision_offset_y, portal)
 	else:
 		add_child(instance)
+
+
+func _spawn_portal_trigger(world_pos: Vector3, collision_size: Vector3, offset_y: float, portal: Dictionary) -> void:
+	var area := Area3D.new()
+	area.name = "PortalTrigger"
+	area.set_meta("portal", portal)
+
+	var col_shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(collision_size.x + 1.0, collision_size.y, collision_size.z + 1.0)
+	col_shape.shape = box
+	area.add_child(col_shape)
+
+	area.transform.origin = Vector3(world_pos.x, offset_y, world_pos.z)
+	area.body_entered.connect(_on_portal_body_entered.bind(portal))
+	_nav_region.add_child(area)
+
+
+func _on_portal_body_entered(body: Node3D, portal: Dictionary) -> void:
+	if body is CharacterBody3D:
+		var target_path: String = "res://" + str(portal.map_path)
+		var spawn_pos := Vector3(float(portal.spawn_x), 0, float(portal.spawn_z))
+		var spawn_rot: float = float(portal.spawn_rotation)
+		GameManager.transition_to_map(target_path, spawn_pos, spawn_rot)
 
 
 # --- Items ---

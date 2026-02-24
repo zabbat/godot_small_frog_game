@@ -114,6 +114,15 @@ func _process_walk() -> void:
 	move_and_slide()
 
 
+func reset_state() -> void:
+	_state = State.IDLE
+	velocity = Vector3.ZERO
+	if _selected_item and _selected_item.has_method("unhighlight"):
+		_selected_item.unhighlight()
+	_selected_item = null
+	_hide_dialog()
+
+
 func _show_dialog(text: String) -> void:
 	_dialog.get_node("Label").text = text
 	_dialog.visible = true
