@@ -38,7 +38,12 @@ Maps characters to types for the corresponding layer.
 
 **Objects legend values:**
 - `<model_id>` or `<model_id>, <rotation_degrees>`
+- With portal: `<model_id>, <rotation>, (<action>, <map_path>, <spawn_x>, <spawn_z>, <spawn_rotation>)`
 - Model ID must exist in `assets/asset_registry.cfg`
+- Portal actions: `TOUCH` — triggers map transition when player collides with the object
+- Portal `map_path` is relative to `res://` (e.g. `maps/test_house_1.map`)
+- `spawn_col`, `spawn_row` — player grid position in the target map (column, row)
+- `spawn_rotation` — player facing direction in degrees
 
 ### [items]
 
@@ -102,7 +107,7 @@ Items placed at exact world positions (not grid-snapped).
 1 = grass_3d
 
 [legend:objects]
-H = house_001, 180
+H = house_001, 180, (TOUCH, maps/test_house_1.map, 3, 0, 180)
 T = tree_001, 90
 
 [items]
