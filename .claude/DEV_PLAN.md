@@ -25,9 +25,34 @@ Bottom-up phased approach — build core systems first, then layer features on t
 - Serves as proof of concept for future interaction systems
 
 ## Phase 2: World Building
-- Terrain and environment
-- Basic level design
-- Scene management and transitions
+
+### 2.1 — Map Transitions (Interiors)
+- Add a `[portals]` section to the map format: `<name>, (<x>, <y>, <z>), <target_map>, (<spawn_x>, <spawn_y>, <spawn_z>)`
+- Portal objects in the world (e.g. door on a house) that the player can click/walk into
+- Scene transition: unload current map, load target map, place player at spawn position
+- Build an interior map (e.g. inside_house.map) to test entering/exiting a building
+- Fade-to-black or simple transition effect between maps
+
+### 2.2 — World Map & Multi-Area Navigation
+- Create a world map (overworld) where each area is a node the player can walk between
+- Walking to the edge of a local map transitions to the world map
+- Edge portals: define which map edges connect to the world map (or to adjacent maps)
+- On the world map, villages/locations are clickable destinations
+- Entering a destination loads the corresponding local map
+
+### 2.3 — Terrain Height & Elevation
+- Extend the map format to support height data (e.g. a `[layer:height]` grid or per-cell height values)
+- Ground mesh deforms based on height values instead of being a flat plane
+- Navigation mesh adapts to elevation so pathfinding works on slopes/hills
+- Objects and decorations spawn at the correct Y position based on terrain height
+- Camera adjusts smoothly as the player moves across elevation changes
+
+### 2.4 — NPC Placement
+- Add an `[npcs]` section to the map format: `<name>, (<x>, <y>, <z>), <model_id>, <behavior>`
+- NPCs spawn on map load with idle animations
+- Basic behaviors: `idle` (stand still), `wander` (walk randomly within a radius)
+- NPCs have collision so the player can't walk through them
+- Clicking on an NPC triggers a placeholder interaction (e.g. shows their name in dialog)
 
 ## Phase 3: Combat System
 - Player attacks and animations
