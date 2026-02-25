@@ -45,6 +45,23 @@ Maps characters to types for the corresponding layer.
 - `spawn_col`, `spawn_row` — player grid position in the target map (column, row)
 - `spawn_rotation` — player facing direction in degrees
 
+### [confined]
+
+Optional section that adds walls around the map edges for indoor/enclosed areas.
+
+```
+[confined]
+L = c:80808080
+R = c:80808080
+B = c:80808080
+F = c:0D808080
+```
+
+- Keys: `L` (left/−X), `R` (right/+X), `B` (back/−Z), `F` (front/+Z, camera-facing)
+- `c:AARRGGBB` — hex color with alpha first (e.g. `80808080` = grey at 50% opacity)
+- Omit a side to leave it open (no wall)
+- Front wall (`F`) is typically nearly transparent so the camera can see through it
+
 ### [items]
 
 Items placed at exact world positions (not grid-snapped).
