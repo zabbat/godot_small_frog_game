@@ -27,6 +27,7 @@ func load_map(path: String) -> void:
 	_spawn_grass(map_data.layers.get("decoration", []), map_data.legends.get("decoration", {}))
 	_spawn_objects(map_data.layers.get("objects", []), map_data.legends.get("objects", {}))
 	_spawn_items(map_data.items)
+	_spawn_confined_walls(map_data.confined)
 
 	_nav_region.bake_navigation_mesh.call_deferred()
 
@@ -49,7 +50,7 @@ func _clear_spawned() -> void:
 
 func _parse_map_file(path: String) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.READ)
-	var result := {"layers": {}, "legends": {}, "items": []}
+	var result := {"layers": {}, "legends": {}, "items": [], "confined": {}}
 	var section := ""
 	var current_layer := ""
 	var current_legend := ""
@@ -79,6 +80,12 @@ func _parse_map_file(path: String) -> Dictionary:
 				var item := _parse_item_line(line)
 				if item:
 					result.items.append(item)
+			"[confined]":
+				var parts := line.split("=")
+				var key := parts[0].strip_edges()
+				var value := parts[1].strip_edges()
+				if value.begins_with("c:"):
+					result.confined[key] = _parse_argb_hex(value.substr(2))
 			_:
 				if section.begins_with("[layer:"):
 					result.layers[current_layer].append(line)
@@ -361,6 +368,75 @@ func _spawn_items(items: Array) -> void:
 		instance.add_child(area)
 
 		add_child(instance)
+
+
+const WALL_HEIGHT := 3.0
+const WALL_THICKNESS := 0.1
+
+
+func _parse_argb_hex(hex: String) -> Color:
+	if hex.length() != 8:
+		push_warning("Confined: invalid ARGB hex '%s'" % hex)
+		return Color.WHITE
+	var a := hex.substr(0, 2).hex_to_int() / 255.0
+	var r := hex.substr(2, 2).hex_to_int() / 255.0
+	var g := hex.substr(4, 2).hex_to_int() / 255.0
+	var b := hex.substr(6, 2).hex_to_int() / 255.0
+	return Color(r, g, b, a)
+
+
+func _spawn_confined_walls(confined: Dictionary) -> void:
+	if confined.is_empty():
+		return
+
+	var half := ground_size / 2.0
+	var y := WALL_HEIGHT / 2.0
+
+	# side → [position, size]
+	# L/R walls run along Z, B/F walls run along X
+	var wall_defs := {
+		"L": [Vector3(-half, y, 0), Vector3(WALL_THICKNESS, WALL_HEIGHT, ground_size)],
+		"R": [Vector3(half, y, 0), Vector3(WALL_THICKNESS, WALL_HEIGHT, ground_size)],
+		"B": [Vector3(0, y, -half), Vector3(ground_size, WALL_HEIGHT, WALL_THICKNESS)],
+		"F": [Vector3(0, y, half), Vector3(ground_size, WALL_HEIGHT, WALL_THICKNESS)],
+	}
+
+	for side in confined:
+		if not wall_defs.has(side):
+			push_warning("Confined: unknown side '%s'" % side)
+			continue
+
+		var color: Color = confined[side]
+		var pos: Vector3 = wall_defs[side][0]
+		var size: Vector3 = wall_defs[side][1]
+
+		var mesh_instance := MeshInstance3D.new()
+		mesh_instance.name = "ConfinedWall_" + side
+		var box_mesh := BoxMesh.new()
+		box_mesh.size = size
+		mesh_instance.mesh = box_mesh
+		mesh_instance.transform.origin = pos
+
+		var mat_front := StandardMaterial3D.new()
+		mat_front.albedo_color = color
+		mat_front.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat_front.cull_mode = BaseMaterial3D.CULL_BACK
+
+		var back_color := Color(color.r, color.g, color.b, min(color.a, 0.05))
+		var mat_back := StandardMaterial3D.new()
+		mat_back.albedo_color = back_color
+		mat_back.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat_back.cull_mode = BaseMaterial3D.CULL_FRONT
+
+		mesh_instance.material_override = mat_front
+
+		var back_mesh := MeshInstance3D.new()
+		back_mesh.name = "Back"
+		back_mesh.mesh = box_mesh
+		back_mesh.material_override = mat_back
+		mesh_instance.add_child(back_mesh)
+
+		_nav_region.add_child(mesh_instance)
 
 
 func _apply_material(node: Node, mat: Material) -> void:
