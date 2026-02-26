@@ -448,6 +448,7 @@ func _spawn_npcs(npcs: Array) -> void:
 		var npc_node := Node3D.new()
 		npc_node.name = "NPC_" + npc_data.name.replace(" ", "_")
 		npc_node.set_script(npc_script)
+		npc_node.npc_id = npc_data.id
 		npc_node.npc_name = npc_data.name
 		npc_node.info = npc_data.info
 		npc_node.move_pattern = npc_data.pattern

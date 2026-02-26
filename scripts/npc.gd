@@ -1,5 +1,6 @@
 extends Node3D
 
+var npc_id := ""
 var npc_name := ""
 var info := ""
 var move_pattern := "IDLE"
