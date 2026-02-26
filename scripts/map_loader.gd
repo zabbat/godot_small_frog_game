@@ -2,9 +2,11 @@ extends Node3D
 
 @export var map_path := "res://maps/test.map"
 @export var registry_path := "res://assets/asset_registry.cfg"
+@export var npc_registry_path := "res://assets/npc_registry.cfg"
 @export var ground_size := 20.0
 
 var _registry := ConfigFile.new()
+var _npc_registry := ConfigFile.new()
 var _grid_cols := 0
 var _grid_rows := 0
 var _cell_size := 0.0
@@ -15,6 +17,7 @@ var _cell_size := 0.0
 
 func _ready() -> void:
 	_registry.load(registry_path)
+	_npc_registry.load(npc_registry_path)
 	load_map(map_path)
 
 
@@ -27,6 +30,7 @@ func load_map(path: String) -> void:
 	_spawn_grass(map_data.layers.get("decoration", []), map_data.legends.get("decoration", {}))
 	_spawn_objects(map_data.layers.get("objects", []), map_data.legends.get("objects", {}))
 	_spawn_items(map_data.items)
+	_spawn_npcs(map_data.npcs)
 	_spawn_confined_walls(map_data.confined)
 
 	_nav_region.bake_navigation_mesh.call_deferred()
@@ -50,7 +54,7 @@ func _clear_spawned() -> void:
 
 func _parse_map_file(path: String) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.READ)
-	var result := {"layers": {}, "legends": {}, "items": [], "confined": {}}
+	var result := {"layers": {}, "legends": {}, "items": [], "npcs": [], "confined": {}}
 	var section := ""
 	var current_layer := ""
 	var current_legend := ""
@@ -80,6 +84,10 @@ func _parse_map_file(path: String) -> Dictionary:
 				var item := _parse_item_line(line)
 				if item:
 					result.items.append(item)
+			"[npcs]":
+				var npc := _parse_npc_line(line)
+				if not npc.is_empty():
+					result.npcs.append(npc)
 			"[confined]":
 				var parts := line.split("=")
 				var key := parts[0].strip_edges()
@@ -368,6 +376,90 @@ func _spawn_items(items: Array) -> void:
 
 		add_child(instance)
 
+
+# --- NPCs ---
+
+func _parse_npc_line(line: String) -> Dictionary:
+	# Format: id: "name", "info", (col, row), PATTERN
+	var colon := line.find(":")
+	if colon == -1:
+		return {}
+	var npc_id := line.substr(0, colon).strip_edges()
+	var rest := line.substr(colon + 1).strip_edges()
+
+	# Extract quoted strings
+	var name_str := ""
+	var info_str := ""
+	var quote_idx := rest.find("\"")
+	if quote_idx != -1:
+		var end_quote := rest.find("\"", quote_idx + 1)
+		if end_quote != -1:
+			name_str = rest.substr(quote_idx + 1, end_quote - quote_idx - 1)
+			rest = rest.substr(end_quote + 1).strip_edges().trim_prefix(",").strip_edges()
+	quote_idx = rest.find("\"")
+	if quote_idx != -1:
+		var end_quote := rest.find("\"", quote_idx + 1)
+		if end_quote != -1:
+			info_str = rest.substr(quote_idx + 1, end_quote - quote_idx - 1)
+			rest = rest.substr(end_quote + 1).strip_edges().trim_prefix(",").strip_edges()
+
+	# Extract (col, row)
+	var paren_start := rest.find("(")
+	var paren_end := rest.find(")")
+	var col := 0
+	var row := 0
+	if paren_start != -1 and paren_end != -1:
+		var coords := rest.substr(paren_start + 1, paren_end - paren_start - 1).split(",")
+		col = int(coords[0].strip_edges())
+		row = int(coords[1].strip_edges())
+		rest = rest.substr(paren_end + 1).strip_edges().trim_prefix(",").strip_edges()
+
+	var pattern := rest.strip_edges()
+	if pattern.is_empty():
+		pattern = "IDLE"
+
+	return {"id": npc_id, "name": name_str, "info": info_str, "col": col, "row": row, "pattern": pattern}
+
+
+func _spawn_npcs(npcs: Array) -> void:
+	var npc_script := load("res://scripts/npc.gd")
+
+	for npc_data in npcs:
+		var npc_id: String = npc_data.id
+		if not _npc_registry.has_section(npc_id):
+			push_warning("NPC registry: unknown NPC '%s'" % npc_id)
+			continue
+
+		var model_path: String = _npc_registry.get_value(npc_id, "model", "")
+		var mat_path: String = _npc_registry.get_value(npc_id, "material", "")
+		var idle_anim_path: String = _npc_registry.get_value(npc_id, "idle_animation", "")
+
+		if model_path.is_empty():
+			push_warning("NPC registry: no model for '%s'" % npc_id)
+			continue
+
+		var model_scene: PackedScene = load(model_path)
+		var model_instance := model_scene.instantiate()
+
+		if mat_path != "":
+			var mat: Material = load(mat_path)
+			_apply_material(model_instance, mat)
+
+		var npc_node := Node3D.new()
+		npc_node.name = "NPC_" + npc_data.name.replace(" ", "_")
+		npc_node.set_script(npc_script)
+		npc_node.npc_name = npc_data.name
+		npc_node.info = npc_data.info
+		npc_node.move_pattern = npc_data.pattern
+
+		var world_pos := grid_to_world(npc_data.col, npc_data.row)
+		npc_node.transform.origin = world_pos
+
+		add_child(npc_node)
+		npc_node.setup(model_instance, idle_anim_path)
+
+
+# --- Confined walls ---
 
 const WALL_HEIGHT := 3.0
 const WALL_THICKNESS := 0.1

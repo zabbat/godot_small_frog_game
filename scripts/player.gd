@@ -83,12 +83,17 @@ func _process_walk() -> void:
 	var to_target := _target - global_position
 	to_target.y = 0.0
 
-	# Check if we reached a highlighted item
+	# Check if we reached a highlighted item/NPC
 	if _selected_item:
 		var dist_to_item := (_selected_item.global_position - global_position)
 		dist_to_item.y = 0.0
 		if dist_to_item.length() < INTERACT_DISTANCE:
-			_show_dialog(_selected_item.item_name)
+			var display_name: String = ""
+			if "npc_name" in _selected_item:
+				display_name = _selected_item.npc_name
+			elif "item_name" in _selected_item:
+				display_name = _selected_item.item_name
+			_show_dialog(display_name)
 			_state = State.IDLE
 			return
 

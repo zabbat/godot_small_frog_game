@@ -67,6 +67,16 @@ H = house_001, 180, (TOUCH, maps/test_house_1.map, 3, 1, 0)
 K = house_001, 90
 T = tree_001, 90
 
+# npcs
+# <id>: "<name>", "<info>", (<spawn_col>, <spawn_row>), <move_pattern>
+# id: lookup key in npc_registry.cfg.
+# name: display name (quoted).
+# info: context string (quoted), e.g. "village" for future interaction lookups.
+# spawn_col, spawn_row: grid position in the map.
+# move_pattern: IDLE (stand still). Future: PATROL, WANDER, etc.
+[npcs]
+mage: "Dumb Dore", "village", (4, 3), IDLE
+
 # items
 # <name>, (<x>, <y>, <z>), <model_id>
 # Placed at exact world positions (not grid-snapped).
