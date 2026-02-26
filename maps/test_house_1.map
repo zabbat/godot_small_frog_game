@@ -41,7 +41,7 @@
 1 = none, 0, (TOUCH, maps/test.map, 6, 3, 90)
 
 [confined]
-L = c:80C8A882
-R = c:80C8A882
-B = c:80C8A882
-F = c:0DC8A882
+L = c:80C8A882, []
+R = c:80C8A882, []
+B = c:80C8A882, [3]
+F = c:80C8A882, []
