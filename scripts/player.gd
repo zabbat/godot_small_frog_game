@@ -13,7 +13,12 @@ var _selected_item: Node3D
 
 @onready var _camera: Camera3D = get_viewport().get_camera_3d()
 @onready var _nav_agent: NavigationAgent3D = $NavigationAgent3D
-@onready var _dialog: PanelContainer = $CanvasLayer/DialogUI
+@onready var _item_dialog: PanelContainer = $CanvasLayer/ItemDialogUI
+@onready var _item_dialog_label: Label = $CanvasLayer/ItemDialogUI/Margin/Label
+@onready var _npc_dialog: PanelContainer = $CanvasLayer/NpcDialogUI
+@onready var _npc_dialog_name: Label = $CanvasLayer/NpcDialogUI/Margin/HBox/VBox/NameLabel
+@onready var _npc_dialog_label: Label = $CanvasLayer/NpcDialogUI/Margin/HBox/VBox/Label
+@onready var _npc_dialog_portrait: TextureRect = $CanvasLayer/NpcDialogUI/Margin/HBox/Portrait
 
 
 func _ready() -> void:
@@ -83,12 +88,18 @@ func _process_walk() -> void:
 	var to_target := _target - global_position
 	to_target.y = 0.0
 
-	# Check if we reached a highlighted item
+	# Check if we reached a highlighted item/NPC
 	if _selected_item:
 		var dist_to_item := (_selected_item.global_position - global_position)
 		dist_to_item.y = 0.0
 		if dist_to_item.length() < INTERACT_DISTANCE:
-			_show_dialog(_selected_item.item_name)
+			if "npc_id" in _selected_item:
+				var data := DialogManager.get_dialog(_selected_item.npc_id)
+				if _selected_item.has_method("pause_movement"):
+					_selected_item.pause_movement()
+				_show_npc_dialog(_selected_item.npc_name, data.get("line", ""), data.get("portrait", ""))
+			elif "item_name" in _selected_item:
+				_show_item_dialog(_selected_item.item_name)
 			_state = State.IDLE
 			return
 
@@ -123,13 +134,25 @@ func reset_state() -> void:
 	_hide_dialog()
 
 
-func _show_dialog(text: String) -> void:
-	_dialog.get_node("Label").text = text
-	_dialog.visible = true
+func _show_item_dialog(text: String) -> void:
+	_item_dialog_label.text = text
+	_item_dialog.visible = true
+
+
+func _show_npc_dialog(npc_display_name: String, text: String, portrait_path: String = "") -> void:
+	_npc_dialog_name.text = npc_display_name
+	_npc_dialog_label.text = text
+	if portrait_path != "":
+		_npc_dialog_portrait.texture = load(portrait_path)
+	_npc_dialog.visible = true
 
 
 func _hide_dialog() -> void:
-	_dialog.visible = false
+	_item_dialog.visible = false
+	if _npc_dialog.visible and _selected_item and _selected_item.has_method("resume_movement"):
+		_selected_item.resume_movement()
+	_npc_dialog.visible = false
+	_npc_dialog_portrait.texture = null
 
 
 func _find_pickup(node: Node) -> Node3D:

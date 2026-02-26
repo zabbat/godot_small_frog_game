@@ -1,0 +1,11 @@
+{
+	"mage": {
+		"portrait": "res://assets/portraits/mage_default.png",
+		"default": [
+			{"line": "Hi stranger."}
+		],
+		"amazed": [
+			{"line": "Wow, that's incredible!"}
+		]
+	}
+}

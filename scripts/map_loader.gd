@@ -2,9 +2,11 @@ extends Node3D
 
 @export var map_path := "res://maps/test.map"
 @export var registry_path := "res://assets/asset_registry.cfg"
+@export var npc_registry_path := "res://assets/npc_registry.cfg"
 @export var ground_size := 20.0
 
 var _registry := ConfigFile.new()
+var _npc_registry := ConfigFile.new()
 var _grid_cols := 0
 var _grid_rows := 0
 var _cell_size := 0.0
@@ -15,6 +17,7 @@ var _cell_size := 0.0
 
 func _ready() -> void:
 	_registry.load(registry_path)
+	_npc_registry.load(npc_registry_path)
 	load_map(map_path)
 
 
@@ -27,6 +30,7 @@ func load_map(path: String) -> void:
 	_spawn_grass(map_data.layers.get("decoration", []), map_data.legends.get("decoration", {}))
 	_spawn_objects(map_data.layers.get("objects", []), map_data.legends.get("objects", {}))
 	_spawn_items(map_data.items)
+	_spawn_npcs(map_data.npcs)
 	_spawn_confined_walls(map_data.confined)
 
 	_nav_region.bake_navigation_mesh.call_deferred()
@@ -50,14 +54,14 @@ func _clear_spawned() -> void:
 
 func _parse_map_file(path: String) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.READ)
-	var result := {"layers": {}, "legends": {}, "items": [], "confined": {}}
+	var result := {"layers": {}, "legends": {}, "items": [], "npcs": [], "confined": {}}
 	var section := ""
 	var current_layer := ""
 	var current_legend := ""
 
 	while not file.eof_reached():
 		var line := file.get_line().strip_edges()
-		if line.is_empty():
+		if line.is_empty() or line.begins_with("#"):
 			continue
 		if line.begins_with("["):
 			section = line
@@ -80,12 +84,15 @@ func _parse_map_file(path: String) -> Dictionary:
 				var item := _parse_item_line(line)
 				if item:
 					result.items.append(item)
+			"[npcs]":
+				var npc := _parse_npc_line(line)
+				if not npc.is_empty():
+					result.npcs.append(npc)
 			"[confined]":
 				var parts := line.split("=")
 				var key := parts[0].strip_edges()
 				var value := parts[1].strip_edges()
-				if value.begins_with("c:"):
-					result.confined[key] = _parse_argb_hex(value.substr(2))
+				result.confined[key] = _parse_confined_value(value)
 			_:
 				if section.begins_with("[layer:"):
 					result.layers[current_layer].append(line)
@@ -370,6 +377,92 @@ func _spawn_items(items: Array) -> void:
 		add_child(instance)
 
 
+# --- NPCs ---
+
+func _parse_npc_line(line: String) -> Dictionary:
+	# Format: id: "name", "info", (col, row), PATTERN
+	var colon := line.find(":")
+	if colon == -1:
+		return {}
+	var npc_id := line.substr(0, colon).strip_edges()
+	var rest := line.substr(colon + 1).strip_edges()
+
+	# Extract quoted strings
+	var name_str := ""
+	var info_str := ""
+	var quote_idx := rest.find("\"")
+	if quote_idx != -1:
+		var end_quote := rest.find("\"", quote_idx + 1)
+		if end_quote != -1:
+			name_str = rest.substr(quote_idx + 1, end_quote - quote_idx - 1)
+			rest = rest.substr(end_quote + 1).strip_edges().trim_prefix(",").strip_edges()
+	quote_idx = rest.find("\"")
+	if quote_idx != -1:
+		var end_quote := rest.find("\"", quote_idx + 1)
+		if end_quote != -1:
+			info_str = rest.substr(quote_idx + 1, end_quote - quote_idx - 1)
+			rest = rest.substr(end_quote + 1).strip_edges().trim_prefix(",").strip_edges()
+
+	# Extract (col, row)
+	var paren_start := rest.find("(")
+	var paren_end := rest.find(")")
+	var col := 0
+	var row := 0
+	if paren_start != -1 and paren_end != -1:
+		var coords := rest.substr(paren_start + 1, paren_end - paren_start - 1).split(",")
+		col = int(coords[0].strip_edges())
+		row = int(coords[1].strip_edges())
+		rest = rest.substr(paren_end + 1).strip_edges().trim_prefix(",").strip_edges()
+
+	var pattern := rest.strip_edges()
+	if pattern.is_empty():
+		pattern = "IDLE"
+
+	return {"id": npc_id, "name": name_str, "info": info_str, "col": col, "row": row, "pattern": pattern}
+
+
+func _spawn_npcs(npcs: Array) -> void:
+	var npc_script := load("res://scripts/npc.gd")
+
+	for npc_data in npcs:
+		var npc_id: String = npc_data.id
+		if not _npc_registry.has_section(npc_id):
+			push_warning("NPC registry: unknown NPC '%s'" % npc_id)
+			continue
+
+		var model_path: String = _npc_registry.get_value(npc_id, "model", "")
+		var mat_path: String = _npc_registry.get_value(npc_id, "material", "")
+		var idle_anim_path: String = _npc_registry.get_value(npc_id, "idle_animation", "")
+		var walk_anim_path: String = _npc_registry.get_value(npc_id, "walk_animation", "")
+
+		if model_path.is_empty():
+			push_warning("NPC registry: no model for '%s'" % npc_id)
+			continue
+
+		var model_scene: PackedScene = load(model_path)
+		var model_instance := model_scene.instantiate()
+
+		if mat_path != "":
+			var mat: Material = load(mat_path)
+			_apply_material(model_instance, mat)
+
+		var npc_node := Node3D.new()
+		npc_node.name = "NPC_" + npc_data.name.replace(" ", "_")
+		npc_node.set_script(npc_script)
+		npc_node.npc_id = npc_data.id
+		npc_node.npc_name = npc_data.name
+		npc_node.info = npc_data.info
+		npc_node.move_pattern = npc_data.pattern
+
+		var world_pos := grid_to_world(npc_data.col, npc_data.row)
+		npc_node.transform.origin = world_pos
+
+		add_child(npc_node)
+		npc_node.setup(model_instance, idle_anim_path, walk_anim_path)
+
+
+# --- Confined walls ---
+
 const WALL_HEIGHT := 3.0
 const WALL_THICKNESS := 0.1
 
@@ -385,6 +478,23 @@ func _parse_argb_hex(hex: String) -> Color:
 	return Color(r, g, b, a)
 
 
+func _parse_confined_value(value: String) -> Dictionary:
+	var result := {"color": Color.WHITE, "cutouts": []}
+	var bracket_start := value.find("[")
+	var color_part := value
+	if bracket_start != -1:
+		color_part = value.substr(0, bracket_start).strip_edges().trim_suffix(",").strip_edges()
+		var bracket_end := value.find("]", bracket_start)
+		if bracket_end != -1:
+			var inner := value.substr(bracket_start + 1, bracket_end - bracket_start - 1).strip_edges()
+			if not inner.is_empty():
+				for idx in inner.split(","):
+					result.cutouts.append(int(idx.strip_edges()))
+	if color_part.begins_with("c:"):
+		result.color = _parse_argb_hex(color_part.substr(2))
+	return result
+
+
 func _spawn_confined_walls(confined: Dictionary) -> void:
 	if confined.is_empty():
 		return
@@ -392,51 +502,83 @@ func _spawn_confined_walls(confined: Dictionary) -> void:
 	var half := ground_size / 2.0
 	var y := WALL_HEIGHT / 2.0
 
-	# side → [position, size]
-	# L/R walls run along Z, B/F walls run along X
-	var wall_defs := {
-		"L": [Vector3(-half, y, 0), Vector3(WALL_THICKNESS, WALL_HEIGHT, ground_size)],
-		"R": [Vector3(half, y, 0), Vector3(WALL_THICKNESS, WALL_HEIGHT, ground_size)],
-		"B": [Vector3(0, y, -half), Vector3(ground_size, WALL_HEIGHT, WALL_THICKNESS)],
-		"F": [Vector3(0, y, half), Vector3(ground_size, WALL_HEIGHT, WALL_THICKNESS)],
-	}
-
 	for side in confined:
-		if not wall_defs.has(side):
+		if side not in ["L", "R", "B", "F"]:
 			push_warning("Confined: unknown side '%s'" % side)
 			continue
 
-		var color: Color = confined[side]
-		var pos: Vector3 = wall_defs[side][0]
-		var size: Vector3 = wall_defs[side][1]
+		var wall_data: Dictionary = confined[side]
+		var color: Color = wall_data.color
+		var cutouts: Array = wall_data.cutouts
 
-		var mesh_instance := MeshInstance3D.new()
-		mesh_instance.name = "ConfinedWall_" + side
-		var box_mesh := BoxMesh.new()
-		box_mesh.size = size
-		mesh_instance.mesh = box_mesh
-		mesh_instance.transform.origin = pos
+		# L/R walls run along Z (use _grid_rows), B/F walls run along X (use _grid_cols)
+		var is_vertical: bool = side == "L" or side == "R"
+		var cell_count := _grid_rows if is_vertical else _grid_cols
 
-		var mat_front := StandardMaterial3D.new()
-		mat_front.albedo_color = color
-		mat_front.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat_front.cull_mode = BaseMaterial3D.CULL_BACK
+		# Build list of solid segments (merging consecutive non-cutout cells)
+		var segments: Array = []  # Array of [start_idx, length]
+		var seg_start := -1
+		for i in cell_count:
+			if i in cutouts:
+				if seg_start != -1:
+					segments.append([seg_start, i - seg_start])
+					seg_start = -1
+			else:
+				if seg_start == -1:
+					seg_start = i
+		if seg_start != -1:
+			segments.append([seg_start, cell_count - seg_start])
 
-		var back_color := Color(color.r, color.g, color.b, min(color.a, 0.05))
-		var mat_back := StandardMaterial3D.new()
-		mat_back.albedo_color = back_color
-		mat_back.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat_back.cull_mode = BaseMaterial3D.CULL_FRONT
+		for seg in segments:
+			var seg_idx: int = seg[0]
+			var seg_len: int = seg[1]
+			var seg_world_size := seg_len * _cell_size
 
-		mesh_instance.material_override = mat_front
+			# Calculate segment center along the wall axis
+			var seg_center := (seg_idx + seg_len / 2.0) * _cell_size - half
 
-		var back_mesh := MeshInstance3D.new()
-		back_mesh.name = "Back"
-		back_mesh.mesh = box_mesh
-		back_mesh.material_override = mat_back
-		mesh_instance.add_child(back_mesh)
+			var pos: Vector3
+			var size: Vector3
+			if is_vertical:
+				var x := -half if side == "L" else half
+				pos = Vector3(x, y, seg_center)
+				size = Vector3(WALL_THICKNESS, WALL_HEIGHT, seg_world_size)
+			else:
+				var z := -half if side == "B" else half
+				pos = Vector3(seg_center, y, z)
+				size = Vector3(seg_world_size, WALL_HEIGHT, WALL_THICKNESS)
 
-		_nav_region.add_child(mesh_instance)
+			_spawn_wall_segment(side, pos, size, color)
+
+
+func _spawn_wall_segment(side: String, pos: Vector3, size: Vector3, color: Color) -> void:
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.name = "ConfinedWall_" + side
+	var box_mesh := BoxMesh.new()
+	box_mesh.size = size
+	mesh_instance.mesh = box_mesh
+	mesh_instance.transform.origin = pos
+
+	var mat_front := StandardMaterial3D.new()
+	mat_front.albedo_color = color
+	mat_front.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat_front.cull_mode = BaseMaterial3D.CULL_BACK
+
+	var back_color := Color(color.r, color.g, color.b, min(color.a, 0.05))
+	var mat_back := StandardMaterial3D.new()
+	mat_back.albedo_color = back_color
+	mat_back.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat_back.cull_mode = BaseMaterial3D.CULL_FRONT
+
+	mesh_instance.material_override = mat_front
+
+	var back_mesh := MeshInstance3D.new()
+	back_mesh.name = "Back"
+	back_mesh.mesh = box_mesh
+	back_mesh.material_override = mat_back
+	mesh_instance.add_child(back_mesh)
+
+	_nav_region.add_child(mesh_instance)
 
 
 func _apply_material(node: Node, mat: Material) -> void:

@@ -17,6 +17,7 @@ config/features=PackedStringArray("4.6")
 [autoload]
 
 GameManager="*res://scripts/game_manager.gd"
+DialogManager="*res://scripts/dialog_manager.gd"
 
 [display]
 

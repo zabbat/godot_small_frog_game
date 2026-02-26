@@ -19,10 +19,10 @@ func _ready() -> void:
 	if material is StandardMaterial3D:
 		var src := material as StandardMaterial3D
 		_highlight_material.albedo_texture = src.albedo_texture
-	_highlight_material.albedo_color = highlight_color
+	_highlight_material.albedo_color = Color(1.0, 1.0, 1.0)
 	_highlight_material.emission_enabled = true
 	_highlight_material.emission = highlight_color
-	_highlight_material.emission_energy_multiplier = highlight_energy
+	_highlight_material.emission_energy_multiplier = 0.05
 
 
 func highlight() -> void:

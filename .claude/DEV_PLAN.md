@@ -40,19 +40,19 @@ Bottom-up phased approach — build core systems first, then layer features on t
 - On the world map, villages/locations are clickable destinations
 - Entering a destination loads the corresponding local map
 
-### 2.3 — Terrain Height & Elevation
+### 2.3 — Terrain Height & Elevation (skipped for now)
 - Extend the map format to support height data (e.g. a `[layer:height]` grid or per-cell height values)
 - Ground mesh deforms based on height values instead of being a flat plane
 - Navigation mesh adapts to elevation so pathfinding works on slopes/hills
 - Objects and decorations spawn at the correct Y position based on terrain height
 - Camera adjusts smoothly as the player moves across elevation changes
 
-### 2.4 — NPC Placement
-- Add an `[npcs]` section to the map format: `<name>, (<x>, <y>, <z>), <model_id>, <behavior>`
-- NPCs spawn on map load with idle animations
-- Basic behaviors: `idle` (stand still), `wander` (walk randomly within a radius)
-- NPCs have collision so the player can't walk through them
-- Clicking on an NPC triggers a placeholder interaction (e.g. shows their name in dialog)
+### 2.4 — NPC Placement ✓
+- `[npcs]` section in map files: `<id>: "<name>", "<info>", (<col>, <row>), <pattern>`
+- NPC registry (`assets/npc_registry.cfg`) maps IDs to models, materials, and animations
+- `scripts/npc.gd` loads model, applies material, plays idle animation
+- NPCs spawn at grid positions on map load, cleaned up on map transitions
+- Move patterns: IDLE for now, expandable to PATROL, WANDER, etc.
 
 ## Phase 3: Combat System
 - Player attacks and animations
