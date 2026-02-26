@@ -433,6 +433,7 @@ func _spawn_npcs(npcs: Array) -> void:
 		var model_path: String = _npc_registry.get_value(npc_id, "model", "")
 		var mat_path: String = _npc_registry.get_value(npc_id, "material", "")
 		var idle_anim_path: String = _npc_registry.get_value(npc_id, "idle_animation", "")
+		var walk_anim_path: String = _npc_registry.get_value(npc_id, "walk_animation", "")
 
 		if model_path.is_empty():
 			push_warning("NPC registry: no model for '%s'" % npc_id)
@@ -457,7 +458,7 @@ func _spawn_npcs(npcs: Array) -> void:
 		npc_node.transform.origin = world_pos
 
 		add_child(npc_node)
-		npc_node.setup(model_instance, idle_anim_path)
+		npc_node.setup(model_instance, idle_anim_path, walk_anim_path)
 
 
 # --- Confined walls ---

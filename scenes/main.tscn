@@ -6,6 +6,13 @@
 [ext_resource type="Script" uid="uid://uw5lajyv4jv8" path="res://scripts/map_loader.gd" id="4_map_loader"]
 [ext_resource type="Script" uid="uid://3xg27grr5ytp" path="res://scripts/nav_region.gd" id="7_nav_region"]
 
+[sub_resource type="SystemFont" id="BoldFont"]
+font_weight = 700
+
+[sub_resource type="LabelSettings" id="BoldLabelSettings"]
+font = SubResource("BoldFont")
+font_size = 26
+
 [sub_resource type="NavigationMesh" id="NavMesh_main"]
 agent_max_climb = 0.3
 
@@ -111,9 +118,20 @@ custom_minimum_size = Vector2(192, 192)
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Label" type="Label" parent="Player/CanvasLayer/NpcDialogUI/Margin/HBox" unique_id=1700182703]
+[node name="VBox" type="VBoxContainer" parent="Player/CanvasLayer/NpcDialogUI/Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="NameLabel" type="Label" parent="Player/CanvasLayer/NpcDialogUI/Margin/HBox/VBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(500, 0)
-size_flags_vertical = 1
-theme_override_font_sizes/font_size = 24
+label_settings = SubResource("BoldLabelSettings")
+text = ""
+
+[node name="Label" type="Label" parent="Player/CanvasLayer/NpcDialogUI/Margin/HBox/VBox" unique_id=1700182703]
+layout_mode = 2
+custom_minimum_size = Vector2(500, 0)
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 22
 autowrap_mode = 3

@@ -75,7 +75,7 @@ T = tree_001, 90
 # spawn_col, spawn_row: grid position in the map.
 # move_pattern: IDLE (stand still). Future: PATROL, WANDER, etc.
 [npcs]
-mage: "Dumb Dore", "village", (4, 3), IDLE
+mage: "Dumb LeDore", "village", (4, 3), NEARBY
 
 # items
 # <name>, (<x>, <y>, <z>), <model_id>

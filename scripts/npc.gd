@@ -1,5 +1,11 @@
 extends Node3D
 
+const NEARBY_RADIUS := 2.0
+const NEARBY_SPEED := 1.5
+const NEARBY_ARRIVE_THRESHOLD := 0.2
+const NEARBY_PAUSE_MIN := 1.5
+const NEARBY_PAUSE_MAX := 4.0
+
 var npc_id := ""
 var npc_name := ""
 var info := ""
@@ -8,12 +14,19 @@ var move_pattern := "IDLE"
 var _anim_player: AnimationPlayer
 var _model: Node3D
 var _highlighted := false
-var _mesh_data: Array[Array] = []  # [[MeshInstance3D, [orig_mat0, ...], [highlight_mat0, ...]], ...]
+var _mesh_data: Array[Array] = []
+
+var _spawn_origin := Vector3.ZERO
+var _move_target := Vector3.ZERO
+var _is_walking := false
+var _pause_timer := 0.0
+var _paused := false
 
 
-func setup(model: Node3D, idle_anim_path: String) -> void:
+func setup(model: Node3D, idle_anim_path: String, walk_anim_path: String = "") -> void:
 	_model = model
 	add_child(_model)
+	_spawn_origin = transform.origin
 
 	# Collision body so the player can't walk through
 	var body := StaticBody3D.new()
@@ -33,7 +46,7 @@ func setup(model: Node3D, idle_anim_path: String) -> void:
 		_model.add_child(_anim_player)
 		_anim_player.root_node = _anim_player.get_path_to(_model)
 
-	# Click detection area (larger than collision capsule for easy clicking)
+	# Click detection area
 	var area := Area3D.new()
 	area.name = "ClickArea"
 	var area_shape := CollisionShape3D.new()
@@ -50,7 +63,62 @@ func setup(model: Node3D, idle_anim_path: String) -> void:
 
 	if idle_anim_path != "":
 		_load_animation_library(idle_anim_path, "general")
-		_play_idle()
+	if walk_anim_path != "":
+		_load_animation_library(walk_anim_path, "movement")
+
+	_play_anim("idle")
+
+	if move_pattern == "NEARBY":
+		_pause_timer = randf_range(NEARBY_PAUSE_MIN, NEARBY_PAUSE_MAX)
+
+
+func pause_movement() -> void:
+	_paused = true
+	_is_walking = false
+	_play_anim("idle")
+
+
+func resume_movement() -> void:
+	_paused = false
+	_pause_timer = randf_range(NEARBY_PAUSE_MIN, NEARBY_PAUSE_MAX)
+
+
+func _process(delta: float) -> void:
+	if move_pattern != "NEARBY" or _paused:
+		return
+
+	if _is_walking:
+		_process_nearby_walk(delta)
+	else:
+		_pause_timer -= delta
+		if _pause_timer <= 0.0:
+			_pick_nearby_target()
+
+
+func _process_nearby_walk(delta: float) -> void:
+	var to_target := _move_target - transform.origin
+	to_target.y = 0.0
+
+	if to_target.length() < NEARBY_ARRIVE_THRESHOLD:
+		_is_walking = false
+		_pause_timer = randf_range(NEARBY_PAUSE_MIN, NEARBY_PAUSE_MAX)
+		_play_anim("idle")
+		return
+
+	var direction := to_target.normalized()
+	transform.origin += direction * NEARBY_SPEED * delta
+
+	# Face movement direction (KayKit models face +Z, look_at faces -Z)
+	look_at(global_position - direction, Vector3.UP)
+
+	_play_anim("walk")
+
+
+func _pick_nearby_target() -> void:
+	var angle := randf() * TAU
+	var dist := randf_range(0.5, NEARBY_RADIUS)
+	_move_target = _spawn_origin + Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
+	_is_walking = true
 
 
 func highlight() -> void:
@@ -97,11 +165,16 @@ func _build_material_data(node: Node) -> void:
 		_build_material_data(child)
 
 
-func _play_idle() -> void:
+func _play_anim(type: String) -> void:
 	if not _anim_player:
 		return
-	var anim_name := _find_anim_by_keywords(["idle"])
-	if anim_name != "":
+	var anim_name := ""
+	match type:
+		"idle":
+			anim_name = _find_anim_by_keywords(["idle"])
+		"walk":
+			anim_name = _find_anim_by_keywords(["walk", "run", "moving"])
+	if anim_name != "" and _anim_player.current_animation != anim_name:
 		_anim_player.play(anim_name)
 
 

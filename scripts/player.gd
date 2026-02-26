@@ -16,7 +16,8 @@ var _selected_item: Node3D
 @onready var _item_dialog: PanelContainer = $CanvasLayer/ItemDialogUI
 @onready var _item_dialog_label: Label = $CanvasLayer/ItemDialogUI/Margin/Label
 @onready var _npc_dialog: PanelContainer = $CanvasLayer/NpcDialogUI
-@onready var _npc_dialog_label: Label = $CanvasLayer/NpcDialogUI/Margin/HBox/Label
+@onready var _npc_dialog_name: Label = $CanvasLayer/NpcDialogUI/Margin/HBox/VBox/NameLabel
+@onready var _npc_dialog_label: Label = $CanvasLayer/NpcDialogUI/Margin/HBox/VBox/Label
 @onready var _npc_dialog_portrait: TextureRect = $CanvasLayer/NpcDialogUI/Margin/HBox/Portrait
 
 
@@ -94,7 +95,9 @@ func _process_walk() -> void:
 		if dist_to_item.length() < INTERACT_DISTANCE:
 			if "npc_id" in _selected_item:
 				var data := DialogManager.get_dialog(_selected_item.npc_id)
-				_show_npc_dialog(data.get("line", ""), data.get("portrait", ""))
+				if _selected_item.has_method("pause_movement"):
+					_selected_item.pause_movement()
+				_show_npc_dialog(_selected_item.npc_name, data.get("line", ""), data.get("portrait", ""))
 			elif "item_name" in _selected_item:
 				_show_item_dialog(_selected_item.item_name)
 			_state = State.IDLE
@@ -136,7 +139,8 @@ func _show_item_dialog(text: String) -> void:
 	_item_dialog.visible = true
 
 
-func _show_npc_dialog(text: String, portrait_path: String = "") -> void:
+func _show_npc_dialog(npc_display_name: String, text: String, portrait_path: String = "") -> void:
+	_npc_dialog_name.text = npc_display_name
 	_npc_dialog_label.text = text
 	if portrait_path != "":
 		_npc_dialog_portrait.texture = load(portrait_path)
@@ -145,6 +149,8 @@ func _show_npc_dialog(text: String, portrait_path: String = "") -> void:
 
 func _hide_dialog() -> void:
 	_item_dialog.visible = false
+	if _npc_dialog.visible and _selected_item and _selected_item.has_method("resume_movement"):
+		_selected_item.resume_movement()
 	_npc_dialog.visible = false
 	_npc_dialog_portrait.texture = null
 
