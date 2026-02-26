@@ -1,6 +1,11 @@
+# size
+# <cols>,<rows>
 [size]
 10,10
 
+# layer:<name>
+# Grid of characters. Each character maps to a legend entry.
+# 0 is always empty/none.
 [layer:ground]
 1111000000
 1110000000
@@ -37,18 +42,33 @@
 0T00000000
 0000000000
 
+# legend:ground
+# <char> = none | grass
 [legend:ground]
 0 = none
 1 = grass
 
+# legend:decoration
+# <char> = none | grass_3d
 [legend:decoration]
 0 = none
 1 = grass_3d
 
+# legend:objects
+# <char> = <model_id>, <rotation>, (<action>, <map_path>, <spawn_col>, <spawn_row>, <spawn_rotation>)
+# model_id: ID from asset_registry.cfg, or "none" for invisible portal tiles.
+# rotation: degrees to rotate the model.
+# action: TOUCH = triggers map transition on player collision.
+# map_path: relative to res:// (e.g. maps/test_house_1.map).
+# spawn_col, spawn_row: player grid position in target map.
+# spawn_rotation: player facing direction in degrees.
 [legend:objects]
 H = house_001, 180, (TOUCH, maps/test_house_1.map, 3, 1, 0)
 K = house_001, 90
 T = tree_001, 90
 
+# items
+# <name>, (<x>, <y>, <z>), <model_id>
+# Placed at exact world positions (not grid-snapped).
 [items]
 Sword, (1, 0.5, -3), sword_1handed

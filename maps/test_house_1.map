@@ -1,6 +1,11 @@
+# size
+# <cols>,<rows>
 [size]
 8,8
 
+# layer:<name>
+# Grid of characters. Each character maps to a legend entry.
+# 0 is always empty/none.
 [layer:ground]
 00000000
 00000000
@@ -31,15 +36,38 @@
 00000000
 00000000
 
+# legend:<name>
+# Maps grid characters to types for the corresponding layer.
+# <char> = <value>
+
+# legend:ground
+# <char> = none | grass
 [legend:ground]
 0 = none
 
+# legend:decoration
+# <char> = none | grass_3d
 [legend:decoration]
 0 = none
 
+# legend:objects
+# <char> = <model_id>, <rotation>, (<action>, <map_path>, <spawn_col>, <spawn_row>, <spawn_rotation>)
+# model_id: ID from asset_registry.cfg, or "none" for invisible portal tiles.
+# rotation: degrees to rotate the model.
+# action: TOUCH = triggers map transition on player collision.
+# map_path: relative to res:// (e.g. maps/test.map).
+# spawn_col, spawn_row: player grid position in target map.
+# spawn_rotation: player facing direction in degrees.
 [legend:objects]
 1 = none, 0, (TOUCH, maps/test.map, 6, 3, 90)
 
+# confined
+# Walls around the map edges for indoor/enclosed areas.
+# <direction> = c:<AARRGGBB>, [<gap_list>]
+# direction: L (left), R (right), B (back), F (front).
+# c: color in ARGB hex (alpha first, e.g. 80C8A882 = light brown at 50% opacity).
+# gap_list: grid indices where the wall has a door-sized gap. Empty [] for solid wall.
+# Back faces always render at max 5% opacity so the camera can see through.
 [confined]
 L = c:80C8A882, []
 R = c:80C8A882, []

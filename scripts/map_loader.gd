@@ -57,7 +57,7 @@ func _parse_map_file(path: String) -> Dictionary:
 
 	while not file.eof_reached():
 		var line := file.get_line().strip_edges()
-		if line.is_empty():
+		if line.is_empty() or line.begins_with("#"):
 			continue
 		if line.begins_with("["):
 			section = line
