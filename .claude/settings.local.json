@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git push:*)",
+      "Bash(find:*)",
+      "Read(//c/Users/asus-/Documents/program/godot_proj/first/**)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(xxd:*)",
+      "Bash(git status:*)",
+      "Bash(git pull:*)"
+    ]
+  }
+}

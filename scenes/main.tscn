@@ -6,6 +6,13 @@
 [ext_resource type="Script" uid="uid://uw5lajyv4jv8" path="res://scripts/map_loader.gd" id="4_map_loader"]
 [ext_resource type="Script" uid="uid://3xg27grr5ytp" path="res://scripts/nav_region.gd" id="7_nav_region"]
 
+[sub_resource type="SystemFont" id="BoldFont"]
+font_weight = 700
+
+[sub_resource type="LabelSettings" id="BoldLabelSettings"]
+font = SubResource("BoldFont")
+font_size = 26
+
 [sub_resource type="NavigationMesh" id="NavMesh_main"]
 agent_max_climb = 0.3
 
@@ -60,17 +67,71 @@ target_desired_distance = 0.3
 
 [node name="CanvasLayer" type="CanvasLayer" parent="Player" unique_id=423062934]
 
-[node name="DialogUI" type="PanelContainer" parent="Player/CanvasLayer" unique_id=721359776]
+[node name="ItemDialogUI" type="PanelContainer" parent="Player/CanvasLayer"]
 visible = false
-anchors_preset = -1
-anchor_left = 0.45
+anchors_preset = 8
+anchor_left = 0.5
 anchor_top = 0.35
-anchor_right = 0.55
-anchor_bottom = 0.4
+anchor_right = 0.5
+anchor_bottom = 0.35
 grow_horizontal = 2
-grow_vertical = 0
+grow_vertical = 2
 
-[node name="Label" type="Label" parent="Player/CanvasLayer/DialogUI" unique_id=1700182703]
+[node name="Margin" type="MarginContainer" parent="Player/CanvasLayer/ItemDialogUI"]
 layout_mode = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 24
+
+[node name="Label" type="Label" parent="Player/CanvasLayer/ItemDialogUI/Margin"]
+layout_mode = 2
+custom_minimum_size = Vector2(150, 0)
+theme_override_font_sizes/font_size = 22
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="NpcDialogUI" type="PanelContainer" parent="Player/CanvasLayer" unique_id=721359776]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Margin" type="MarginContainer" parent="Player/CanvasLayer/NpcDialogUI"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="HBox" type="HBoxContainer" parent="Player/CanvasLayer/NpcDialogUI/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Portrait" type="TextureRect" parent="Player/CanvasLayer/NpcDialogUI/Margin/HBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(192, 192)
+expand_mode = 1
+stretch_mode = 5
+
+[node name="VBox" type="VBoxContainer" parent="Player/CanvasLayer/NpcDialogUI/Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="NameLabel" type="Label" parent="Player/CanvasLayer/NpcDialogUI/Margin/HBox/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(500, 0)
+label_settings = SubResource("BoldLabelSettings")
+text = ""
+
+[node name="Label" type="Label" parent="Player/CanvasLayer/NpcDialogUI/Margin/HBox/VBox" unique_id=1700182703]
+layout_mode = 2
+custom_minimum_size = Vector2(500, 0)
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 22
+autowrap_mode = 3
