@@ -3,7 +3,8 @@ extends Node3D
 @export var map_path := "res://maps/test.map"
 @export var registry_path := "res://assets/asset_registry.cfg"
 @export var npc_registry_path := "res://assets/npc_registry.cfg"
-@export var ground_size := 20.0
+@export var cell_world_size := 2.0
+var ground_size := 0.0
 
 var _registry := ConfigFile.new()
 var _npc_registry := ConfigFile.new()
@@ -32,6 +33,7 @@ func load_map(path: String) -> void:
 	_spawn_items(map_data.items)
 	_spawn_npcs(map_data.npcs)
 	_spawn_confined_walls(map_data.confined)
+	_apply_map_type(map_data.type)
 
 	_nav_region.bake_navigation_mesh.call_deferred()
 
@@ -52,9 +54,22 @@ func _clear_spawned() -> void:
 		child.queue_free()
 
 
+func _resize_ground() -> void:
+	var plane: PlaneMesh = _ground_mesh.mesh
+	plane.size = Vector2(ground_size, ground_size)
+
+
+func _apply_map_type(map_type: String) -> void:
+	var player: CharacterBody3D = get_node("Player")
+	if map_type == "world":
+		player.scale = Vector3(0.5, 0.5, 0.5)
+	else:
+		player.scale = Vector3.ONE
+
+
 func _parse_map_file(path: String) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.READ)
-	var result := {"layers": {}, "legends": {}, "items": [], "npcs": [], "confined": {}}
+	var result := {"type": "local", "layers": {}, "legends": {}, "items": [], "npcs": [], "confined": {}}
 	var section := ""
 	var current_layer := ""
 	var current_legend := ""
@@ -75,11 +90,15 @@ func _parse_map_file(path: String) -> Dictionary:
 			continue
 
 		match section:
+			"[type]":
+				result.type = line
 			"[size]":
 				var parts := line.split(",")
 				_grid_cols = int(parts[0])
 				_grid_rows = int(parts[1])
-				_cell_size = ground_size / _grid_cols
+				_cell_size = cell_world_size
+				ground_size = _grid_cols * _cell_size
+				_resize_ground()
 			"[items]":
 				var item := _parse_item_line(line)
 				if item:
@@ -220,7 +239,7 @@ func _create_grass_material() -> ShaderMaterial:
 # --- Objects layer ---
 
 func _parse_object_legend(value_str: String) -> Dictionary:
-	var result := {"model_id": "", "rotation": 0.0, "portal": {}}
+	var result := {"model_id": "", "rotation": 0.0, "obj_scale": 1.0, "portal": {}}
 
 	var paren_start := value_str.find("(")
 	var before_paren := value_str
@@ -243,6 +262,8 @@ func _parse_object_legend(value_str: String) -> Dictionary:
 	result.model_id = value_parts[0].strip_edges()
 	if value_parts.size() > 1 and value_parts[1].strip_edges() != "":
 		result.rotation = float(value_parts[1].strip_edges())
+	if value_parts.size() > 2 and value_parts[2].strip_edges() != "":
+		result.obj_scale = float(value_parts[2].strip_edges())
 
 	return result
 
@@ -260,10 +281,10 @@ func _spawn_objects(grid: Array, legend: Dictionary) -> void:
 
 			var parsed := _parse_object_legend(legend[ch])
 			var world_pos := grid_to_world(col_idx, row_idx)
-			_spawn_object(parsed.model_id, world_pos, parsed.rotation, parsed.portal)
+			_spawn_object(parsed.model_id, world_pos, parsed.rotation, parsed.obj_scale, parsed.portal)
 
 
-func _spawn_object(model_id: String, world_pos: Vector3, rotation_deg := 0.0, portal := {}) -> void:
+func _spawn_object(model_id: String, world_pos: Vector3, rotation_deg := 0.0, obj_scale := 1.0, portal := {}) -> void:
 	# Invisible portal tile — no model, just the trigger
 	if model_id == "none":
 		if not portal.is_empty() and portal.action == "TOUCH":
@@ -285,6 +306,8 @@ func _spawn_object(model_id: String, world_pos: Vector3, rotation_deg := 0.0, po
 	instance.transform.origin = world_pos
 	if rotation_deg != 0.0:
 		instance.rotate_y(deg_to_rad(rotation_deg))
+	if obj_scale != 1.0:
+		instance.scale = Vector3(obj_scale, obj_scale, obj_scale)
 
 	if mat_path != "":
 		var mat: Material = load(mat_path)
@@ -315,6 +338,9 @@ func _spawn_object(model_id: String, world_pos: Vector3, rotation_deg := 0.0, po
 			_spawn_portal_trigger(world_pos, collision_size, collision_offset_y, portal)
 	else:
 		add_child(instance)
+		if not portal.is_empty() and portal.action == "TOUCH":
+			var tile_size := Vector3(_cell_size, 1.0, _cell_size)
+			_spawn_portal_trigger(world_pos, tile_size, 0.0, portal)
 
 
 func _spawn_portal_trigger(world_pos: Vector3, collision_size: Vector3, offset_y: float, portal: Dictionary) -> void:

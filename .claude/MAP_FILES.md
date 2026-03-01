@@ -4,6 +4,18 @@ A map file uses named layers — each layer is a separate grid with its own lege
 
 ## Sections
 
+### [type]
+
+Optional map type. Affects rendering style and player scale.
+
+```
+[type]
+world | local
+```
+
+- `local` (default) — standard map with normal player scale
+- `world` — overworld map; player is scaled down (0.5x) to make the map feel larger
+
 ### [size]
 
 Grid dimensions shared by all layers.
@@ -37,9 +49,9 @@ Maps characters to types for the corresponding layer.
 - `grass_3d` — 3D grass blades with wind sway
 
 **Objects legend values:**
-- `<model_id>` or `<model_id>, <rotation_degrees>`
-- With portal: `<model_id>, <rotation>, (<action>, <map_path>, <spawn_x>, <spawn_z>, <spawn_rotation>)`
-- Model ID must exist in `assets/asset_registry.cfg`
+- `<model_id>, <rotation>, <scale>` — basic object with rotation (degrees) and uniform scale (1.0 = default)
+- With portal: `<model_id>, <rotation>, <scale>, (<action>, <map_path>, <spawn_col>, <spawn_row>, <spawn_rotation>)`
+- Model ID must exist in `assets/asset_registry.cfg`; use `none` for invisible portal tiles
 - Portal actions: `TOUCH` — triggers map transition when player collides with the object
 - Portal `map_path` is relative to `res://` (e.g. `maps/test_house_1.map`)
 - `spawn_col`, `spawn_row` — player grid position in the target map (column, row)
@@ -94,6 +106,9 @@ Items placed at exact world positions (not grid-snapped).
 ## Full Example
 
 ```
+[type]
+local
+
 [size]
 10,10
 
@@ -142,8 +157,8 @@ Items placed at exact world positions (not grid-snapped).
 1 = grass_3d
 
 [legend:objects]
-H = house_001, 180, (TOUCH, maps/test_house_1.map, 3, 0, 180)
-T = tree_001, 90
+H = house_001, 180, 1, (TOUCH, maps/test_house_1.map, 3, 0, 180)
+T = tree_001, 90, 1
 
 [items]
 Sword, (-3, 0.5, 2), sword_1handed
