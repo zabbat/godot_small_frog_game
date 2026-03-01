@@ -20,6 +20,8 @@ A small-scale 3rd person 3D mini RPG built with Godot 4.6.
 - Navigation mesh with pathfinding around obstacles
 - Item pickup with highlight and interaction dialog
 - Map transitions with portal system and fade-to-black effect
+- World map with scaled-down player and miniature village models
+- Dynamic ground sizing (maps scale to their grid dimensions)
 - NPC system with registry, idle animations, and NEARBY wander pattern
 - NPC dialog system with JSON data, portraits, and bold name display
 - Confined walls for indoor maps with door cutouts and dual-face transparency
@@ -30,7 +32,7 @@ Levels are defined as `.map` text files with a layered grid format:
 
 - **Ground layer** — controls flat ground texture (grass vs bare dirt)
 - **Decoration layer** — 3D decorations like grass blades
-- **Objects layer** — buildings, trees, and other models with collision and optional portal triggers
+- **Objects layer** — buildings, trees, and other models with collision, scale, and optional portal triggers
 - **Items section** — pickups placed at exact world positions
 - **NPCs section** — characters placed at grid positions with dialog and movement patterns
 - **Confined section** — indoor walls with ARGB transparency and door cutouts
@@ -49,7 +51,7 @@ The project follows a 10-phase plan.
 
 **Phase 2 (World Building) — in progress:**
 1. ~~Map transitions (portal system)~~
-2. World map navigation
+2. ~~World map navigation~~
 3. Terrain height (skipped for now)
 4. ~~NPC placement & dialog~~
 

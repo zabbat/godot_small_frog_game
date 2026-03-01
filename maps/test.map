@@ -1,3 +1,6 @@
+[type]
+local
+
 # size
 # <cols>,<rows>
 [size]
@@ -32,15 +35,15 @@
 
 [layer:objects]
 1111111111
-0000000000
-0000000000
-0000000H00
-0000000000
-000K000000
-0000000000
-0000000000
-0T00000000
-0000000000
+1000000001
+1000000001
+1000000H01
+1000000001
+100K000001
+1000000001
+1000000001
+1T00000001
+1111111111
 
 # legend:ground
 # <char> = none | grass
@@ -63,9 +66,10 @@
 # spawn_col, spawn_row: player grid position in target map.
 # spawn_rotation: player facing direction in degrees.
 [legend:objects]
-H = house_001, 180, (TOUCH, maps/test_house_1.map, 3, 1, 0)
-K = house_001, 90
-T = tree_001, 90
+1 = none, 0, 1, (TOUCH, maps/world_map_test.map, 14, 15, 0)
+H = house_001, 180, 1, (TOUCH, maps/test_house_1.map, 3, 1, 0)
+K = house_001, 90, 1
+T = tree_001, 90, 1
 
 # npcs
 # <id>: "<name>", "<info>", (<spawn_col>, <spawn_row>), <move_pattern>

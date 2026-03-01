@@ -3,7 +3,8 @@ extends Node3D
 @export var map_path := "res://maps/test.map"
 @export var registry_path := "res://assets/asset_registry.cfg"
 @export var npc_registry_path := "res://assets/npc_registry.cfg"
-@export var ground_size := 20.0
+@export var cell_world_size := 2.0
+var ground_size := 0.0
 
 var _registry := ConfigFile.new()
 var _npc_registry := ConfigFile.new()
@@ -26,12 +27,16 @@ func load_map(path: String) -> void:
 	_clear_spawned()
 	var map_data := _parse_map_file(map_path)
 
+	var deco_grid: Array = map_data.layers.get("decoration", [])
+	var deco_legend: Dictionary = map_data.legends.get("decoration", {})
 	_apply_ground_shader(map_data.layers.get("ground", []), map_data.legends.get("ground", {}))
-	_spawn_grass(map_data.layers.get("decoration", []), map_data.legends.get("decoration", {}))
+	_spawn_grass(deco_grid, deco_legend)
+	_spawn_mountains(deco_grid, deco_legend)
 	_spawn_objects(map_data.layers.get("objects", []), map_data.legends.get("objects", {}))
 	_spawn_items(map_data.items)
 	_spawn_npcs(map_data.npcs)
 	_spawn_confined_walls(map_data.confined)
+	_apply_map_type(map_data.type)
 
 	_nav_region.bake_navigation_mesh.call_deferred()
 
@@ -52,9 +57,22 @@ func _clear_spawned() -> void:
 		child.queue_free()
 
 
+func _resize_ground() -> void:
+	var plane: PlaneMesh = _ground_mesh.mesh
+	plane.size = Vector2(ground_size, ground_size)
+
+
+func _apply_map_type(map_type: String) -> void:
+	var player: CharacterBody3D = get_node("Player")
+	if map_type == "world":
+		player.scale = Vector3(0.5, 0.5, 0.5)
+	else:
+		player.scale = Vector3.ONE
+
+
 func _parse_map_file(path: String) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.READ)
-	var result := {"layers": {}, "legends": {}, "items": [], "npcs": [], "confined": {}}
+	var result := {"type": "local", "layers": {}, "legends": {}, "items": [], "npcs": [], "confined": {}}
 	var section := ""
 	var current_layer := ""
 	var current_legend := ""
@@ -75,11 +93,15 @@ func _parse_map_file(path: String) -> Dictionary:
 			continue
 
 		match section:
+			"[type]":
+				result.type = line
 			"[size]":
 				var parts := line.split(",")
 				_grid_cols = int(parts[0])
 				_grid_rows = int(parts[1])
-				_cell_size = ground_size / _grid_cols
+				_cell_size = cell_world_size
+				ground_size = _grid_cols * _cell_size
+				_resize_ground()
 			"[items]":
 				var item := _parse_item_line(line)
 				if item:
@@ -138,17 +160,20 @@ func _apply_ground_shader(grid: Array, legend: Dictionary) -> void:
 	if grid.is_empty():
 		return
 
-	var img := Image.create(_grid_cols, _grid_rows, false, Image.FORMAT_R8)
+	var img := Image.create(_grid_cols, _grid_rows, false, Image.FORMAT_RGBA8)
 
 	for row_idx in grid.size():
 		var row_str: String = grid[row_idx]
 		for col_idx in row_str.length():
 			var ch := row_str[col_idx]
 			var tile_type: String = legend.get(ch, "none")
-			var value := 0.0
+			var r := 0.0  # grass
+			var g := 0.0  # rock
 			if tile_type == "grass":
-				value = 1.0
-			img.set_pixel(col_idx, row_idx, Color(value, 0, 0, 1))
+				r = 1.0
+			elif tile_type == "rock":
+				g = 1.0
+			img.set_pixel(col_idx, row_idx, Color(r, g, 0, 1))
 
 	var tile_tex := ImageTexture.create_from_image(img)
 
@@ -217,10 +242,90 @@ func _create_grass_material() -> ShaderMaterial:
 	return mat
 
 
+# --- Mountains decoration ---
+
+func _spawn_mountains(grid: Array, legend: Dictionary) -> void:
+	if grid.is_empty():
+		return
+
+	# Build a set of mountain positions for neighbor lookup
+	var mountain_positions := {}
+	for row_idx in grid.size():
+		var row_str: String = grid[row_idx]
+		for col_idx in row_str.length():
+			var ch := row_str[col_idx]
+			if legend.get(ch, "none") == "mountains_3d":
+				mountain_positions[Vector2i(col_idx, row_idx)] = true
+
+	if mountain_positions.is_empty():
+		return
+
+	# Create height map texture: each mountain tile stores peak_height / 3.0
+	# Shared across all tiles — shader samples by world position, so adjacent
+	# tiles get the same value at their shared edge = no seam
+	var img := Image.create(_grid_cols, _grid_rows, false, Image.FORMAT_R8)
+	for pos in mountain_positions:
+		var nb_count := 0
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				if dx == 0 and dy == 0:
+					continue
+				if mountain_positions.has(Vector2i(pos.x + dx, pos.y + dy)):
+					nb_count += 1
+		var peak := 1.0 + nb_count * 0.2
+		img.set_pixel(pos.x, pos.y, Color(peak / 3.0, 0, 0, 1))
+
+	var height_tex := ImageTexture.create_from_image(img)
+
+	var mountain_script := load("res://scripts/mountain_patch.gd")
+	var mountain_mat := _create_mountain_material()
+	mountain_mat.set_shader_parameter("height_map", height_tex)
+	mountain_mat.set_shader_parameter("grid_size", Vector2(_grid_cols, _grid_rows))
+	mountain_mat.set_shader_parameter("ground_size_world", ground_size)
+	var ring_mat := _create_mountain_ring_material()
+
+	for pos in mountain_positions:
+		var col_idx: int = pos.x
+		var row_idx: int = pos.y
+		# Cardinal neighbors for edge clamping (keeps pyramid shape at borders)
+		var nb := Vector4(
+			1.0 if mountain_positions.has(Vector2i(col_idx + 1, row_idx)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(col_idx - 1, row_idx)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(col_idx, row_idx + 1)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(col_idx, row_idx - 1)) else 0.0,
+		)
+
+		var world_pos := grid_to_world(col_idx, row_idx)
+
+		var patch := MeshInstance3D.new()
+		patch.set_script(mountain_script)
+		patch.patch_size = Vector2(_cell_size, _cell_size)
+		patch.shared_material = mountain_mat
+		patch.ring_material = ring_mat
+		patch.neighbors = nb
+		patch.transform.origin = world_pos
+		_nav_region.add_child(patch)
+
+
+func _create_mountain_material() -> ShaderMaterial:
+	var shader := load("res://assets/shaders/mountain.gdshader") as Shader
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	return mat
+
+
+func _create_mountain_ring_material() -> ShaderMaterial:
+	var shader := load("res://assets/shaders/mountain_ring.gdshader") as Shader
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	mat.render_priority = 1
+	return mat
+
+
 # --- Objects layer ---
 
 func _parse_object_legend(value_str: String) -> Dictionary:
-	var result := {"model_id": "", "rotation": 0.0, "portal": {}}
+	var result := {"model_id": "", "rotation": 0.0, "obj_scale": 1.0, "portal": {}}
 
 	var paren_start := value_str.find("(")
 	var before_paren := value_str
@@ -243,6 +348,8 @@ func _parse_object_legend(value_str: String) -> Dictionary:
 	result.model_id = value_parts[0].strip_edges()
 	if value_parts.size() > 1 and value_parts[1].strip_edges() != "":
 		result.rotation = float(value_parts[1].strip_edges())
+	if value_parts.size() > 2 and value_parts[2].strip_edges() != "":
+		result.obj_scale = float(value_parts[2].strip_edges())
 
 	return result
 
@@ -260,10 +367,10 @@ func _spawn_objects(grid: Array, legend: Dictionary) -> void:
 
 			var parsed := _parse_object_legend(legend[ch])
 			var world_pos := grid_to_world(col_idx, row_idx)
-			_spawn_object(parsed.model_id, world_pos, parsed.rotation, parsed.portal)
+			_spawn_object(parsed.model_id, world_pos, parsed.rotation, parsed.obj_scale, parsed.portal)
 
 
-func _spawn_object(model_id: String, world_pos: Vector3, rotation_deg := 0.0, portal := {}) -> void:
+func _spawn_object(model_id: String, world_pos: Vector3, rotation_deg := 0.0, obj_scale := 1.0, portal := {}) -> void:
 	# Invisible portal tile — no model, just the trigger
 	if model_id == "none":
 		if not portal.is_empty() and portal.action == "TOUCH":
@@ -285,6 +392,8 @@ func _spawn_object(model_id: String, world_pos: Vector3, rotation_deg := 0.0, po
 	instance.transform.origin = world_pos
 	if rotation_deg != 0.0:
 		instance.rotate_y(deg_to_rad(rotation_deg))
+	if obj_scale != 1.0:
+		instance.scale = Vector3(obj_scale, obj_scale, obj_scale)
 
 	if mat_path != "":
 		var mat: Material = load(mat_path)
@@ -315,6 +424,9 @@ func _spawn_object(model_id: String, world_pos: Vector3, rotation_deg := 0.0, po
 			_spawn_portal_trigger(world_pos, collision_size, collision_offset_y, portal)
 	else:
 		add_child(instance)
+		if not portal.is_empty() and portal.action == "TOUCH":
+			var tile_size := Vector3(_cell_size, 1.0, _cell_size)
+			_spawn_portal_trigger(world_pos, tile_size, 0.0, portal)
 
 
 func _spawn_portal_trigger(world_pos: Vector3, collision_size: Vector3, offset_y: float, portal: Dictionary) -> void:

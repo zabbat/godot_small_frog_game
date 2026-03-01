@@ -1,3 +1,6 @@
+[type]
+local
+
 # size
 # <cols>,<rows>
 [size]
@@ -59,7 +62,7 @@
 # spawn_col, spawn_row: player grid position in target map.
 # spawn_rotation: player facing direction in degrees.
 [legend:objects]
-1 = none, 0, (TOUCH, maps/test.map, 6, 3, 90)
+1 = none, 0, 1, (TOUCH, maps/test.map, 6, 3, 90)
 
 # confined
 # Walls around the map edges for indoor/enclosed areas.
