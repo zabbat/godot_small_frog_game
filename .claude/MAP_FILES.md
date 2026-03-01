@@ -43,10 +43,12 @@ Maps characters to types for the corresponding layer.
 **Ground legend values:**
 - `none` — bare ground (dark brown)
 - `grass` — procedural grass texture
+- `rock` — rocky grey-brown terrain (use under mountains)
 
 **Decoration legend values:**
 - `none` — no decoration
 - `grass_3d` — 3D grass blades with wind sway
+- `mountains_3d` — procedural rocky mountains (height scales with neighbor density; impassable)
 
 **Objects legend values:**
 - `<model_id>, <rotation>, <scale>` — basic object with rotation (degrees) and uniform scale (1.0 = default)

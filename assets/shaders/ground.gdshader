@@ -9,6 +9,9 @@ uniform vec4 none_color : source_color = vec4(0.35, 0.25, 0.18, 1.0);
 uniform vec4 grass_color_a : source_color = vec4(0.2, 0.45, 0.1, 1.0);
 uniform vec4 grass_color_b : source_color = vec4(0.3, 0.6, 0.15, 1.0);
 uniform vec4 grass_color_dark : source_color = vec4(0.1, 0.28, 0.05, 1.0);
+uniform vec4 rock_color_a : source_color = vec4(0.4, 0.36, 0.3, 1.0);
+uniform vec4 rock_color_b : source_color = vec4(0.5, 0.45, 0.38, 1.0);
+uniform vec4 rock_color_dark : source_color = vec4(0.3, 0.25, 0.2, 1.0);
 
 // Noise scale for grass variation
 uniform float grass_noise_scale = 8.0;
@@ -67,21 +70,39 @@ vec3 grass_pattern(vec2 uv) {
 	return base;
 }
 
+vec3 rock_pattern(vec2 uv) {
+	float n1 = fbm(uv * grass_noise_scale * 1.5);
+	vec3 base = mix(rock_color_a.rgb, rock_color_b.rgb, n1);
+
+	float cracks = noise(uv * grass_detail_scale * 1.2);
+	base = mix(base, rock_color_dark.rgb, smoothstep(0.45, 0.55, cracks) * 0.5);
+
+	float patches = fbm(uv * grass_noise_scale * 0.8 + vec2(13.0, 7.0));
+	base = mix(base, rock_color_dark.rgb, smoothstep(0.5, 0.7, patches) * 0.3);
+
+	return base;
+}
+
 void fragment() {
 	// Map world position to tile UV (0..1 range over the ground)
 	float half_size = ground_size_world / 2.0;
 	vec2 tile_uv = (world_pos.xz + half_size) / ground_size_world;
 	tile_uv = clamp(tile_uv, 0.0, 1.0);
 
-	// Sample tile map — red channel encodes tile type
+	// Sample tile map — R = grass, G = rock
 	// filter_linear on the sampler gives us smooth blending at borders
-	float tile_value = texture(tile_map, tile_uv).r;
+	vec2 tile_value = texture(tile_map, tile_uv).rg;
+	float grass_val = tile_value.r;
+	float rock_val = tile_value.g;
 
 	// Generate patterns
 	vec3 ground = none_color.rgb;
 	vec3 grass = grass_pattern(world_pos.xz);
+	vec3 rock = rock_pattern(world_pos.xz);
 
-	// Blend based on tile value (0.0 = none, 1.0 = grass)
-	ALBEDO = mix(ground, grass, tile_value);
-	ROUGHNESS = mix(0.9, 0.75, tile_value);
+	// Layer blending: none -> rock -> grass (grass on top)
+	vec3 result = mix(ground, rock, rock_val);
+	result = mix(result, grass, grass_val);
+	ALBEDO = result;
+	ROUGHNESS = mix(0.9, 0.75, max(grass_val, rock_val));
 }

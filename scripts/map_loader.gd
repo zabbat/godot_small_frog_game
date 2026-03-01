@@ -27,8 +27,11 @@ func load_map(path: String) -> void:
 	_clear_spawned()
 	var map_data := _parse_map_file(map_path)
 
+	var deco_grid: Array = map_data.layers.get("decoration", [])
+	var deco_legend: Dictionary = map_data.legends.get("decoration", {})
 	_apply_ground_shader(map_data.layers.get("ground", []), map_data.legends.get("ground", {}))
-	_spawn_grass(map_data.layers.get("decoration", []), map_data.legends.get("decoration", {}))
+	_spawn_grass(deco_grid, deco_legend)
+	_spawn_mountains(deco_grid, deco_legend)
 	_spawn_objects(map_data.layers.get("objects", []), map_data.legends.get("objects", {}))
 	_spawn_items(map_data.items)
 	_spawn_npcs(map_data.npcs)
@@ -157,17 +160,20 @@ func _apply_ground_shader(grid: Array, legend: Dictionary) -> void:
 	if grid.is_empty():
 		return
 
-	var img := Image.create(_grid_cols, _grid_rows, false, Image.FORMAT_R8)
+	var img := Image.create(_grid_cols, _grid_rows, false, Image.FORMAT_RGBA8)
 
 	for row_idx in grid.size():
 		var row_str: String = grid[row_idx]
 		for col_idx in row_str.length():
 			var ch := row_str[col_idx]
 			var tile_type: String = legend.get(ch, "none")
-			var value := 0.0
+			var r := 0.0  # grass
+			var g := 0.0  # rock
 			if tile_type == "grass":
-				value = 1.0
-			img.set_pixel(col_idx, row_idx, Color(value, 0, 0, 1))
+				r = 1.0
+			elif tile_type == "rock":
+				g = 1.0
+			img.set_pixel(col_idx, row_idx, Color(r, g, 0, 1))
 
 	var tile_tex := ImageTexture.create_from_image(img)
 
@@ -233,6 +239,63 @@ func _create_grass_material() -> ShaderMaterial:
 	mat.set_shader_parameter("top_color", Color(0.45, 0.8, 0.15))
 	mat.set_shader_parameter("bot_color", Color(0.15, 0.35, 0.05))
 
+	return mat
+
+
+# --- Mountains decoration ---
+
+func _spawn_mountains(grid: Array, legend: Dictionary) -> void:
+	if grid.is_empty():
+		return
+
+	# Build a set of mountain positions for neighbor lookup
+	var mountain_positions := {}
+	for row_idx in grid.size():
+		var row_str: String = grid[row_idx]
+		for col_idx in row_str.length():
+			var ch := row_str[col_idx]
+			if legend.get(ch, "none") == "mountains_3d":
+				mountain_positions[Vector2i(col_idx, row_idx)] = true
+
+	var mountain_script := load("res://scripts/mountain_patch.gd")
+	var mountain_mat := _create_mountain_material()
+	var ring_mat := _create_mountain_ring_material()
+
+	for pos in mountain_positions:
+		var col_idx: int = pos.x
+		var row_idx: int = pos.y
+		# Neighbors: right(+X), left(-X), down(+Z), up(-Z)
+		var nb := Vector4(
+			1.0 if mountain_positions.has(Vector2i(col_idx + 1, row_idx)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(col_idx - 1, row_idx)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(col_idx, row_idx + 1)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(col_idx, row_idx - 1)) else 0.0,
+		)
+
+		var world_pos := grid_to_world(col_idx, row_idx)
+
+		var patch := MeshInstance3D.new()
+		patch.set_script(mountain_script)
+		patch.patch_size = Vector2(_cell_size, _cell_size)
+		patch.shared_material = mountain_mat
+		patch.ring_material = ring_mat
+		patch.neighbors = nb
+		patch.transform.origin = world_pos
+		_nav_region.add_child(patch)
+
+
+func _create_mountain_material() -> ShaderMaterial:
+	var shader := load("res://assets/shaders/mountain.gdshader") as Shader
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	return mat
+
+
+func _create_mountain_ring_material() -> ShaderMaterial:
+	var shader := load("res://assets/shaders/mountain_ring.gdshader") as Shader
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	mat.render_priority = 1
 	return mat
 
 
