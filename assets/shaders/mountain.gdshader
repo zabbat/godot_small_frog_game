@@ -2,10 +2,16 @@ shader_type spatial;
 
 render_mode cull_back, diffuse_burley;
 
-uniform float peak_height = 1.0;
+// Height map texture: R = peak_height / 3.0 (shared across all mountain tiles)
+uniform sampler2D height_map : filter_linear;
+uniform vec2 grid_size;
+uniform float ground_size_world;
+
 uniform vec3 rock_color_a : source_color = vec3(0.45, 0.35, 0.25);
 uniform vec3 rock_color_b : source_color = vec3(0.55, 0.45, 0.32);
 uniform vec3 rock_color_dark : source_color = vec3(0.25, 0.18, 0.12);
+uniform vec3 snow_color : source_color = vec3(0.95, 0.95, 0.97);
+uniform float snow_line = 0.7;
 uniform float rock_noise_scale = 8.0;
 uniform float rock_detail_scale = 25.0;
 // neighbors: x=right(+X), y=left(-X), z=down(+Z), w=up(-Z)
@@ -42,8 +48,19 @@ float fbm(vec2 p) {
 	return value;
 }
 
+// Sample peak height from shared texture at a world XZ position
+float sample_peak(vec2 world_xz) {
+	float half_size = ground_size_world / 2.0;
+	vec2 grid_uv = (world_xz + half_size) / ground_size_world;
+	return texture(height_map, grid_uv).r * 3.0;
+}
+
 void vertex() {
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+
+	// Sample peak height from shared height map — both adjacent tiles
+	// sample the same world position, so they get the same value = no seam
+	float peak_height = sample_peak(wp.xz);
 
 	// dx/dy: signed distance from center, -1 to 1
 	float dx = (UV.x - 0.5) * 2.0;
@@ -66,7 +83,7 @@ void vertex() {
 	float height = (pyramid + jag * pyramid) * peak_height;
 
 	VERTEX.y += height;
-	height_ratio = clamp(height / peak_height, 0.0, 1.0);
+	height_ratio = clamp(height / max(peak_height, 0.01), 0.0, 1.0);
 	world_pos_frag = wp;
 
 	// Normals via finite differences
@@ -103,6 +120,11 @@ void fragment() {
 	// Dark base, lighter peaks
 	base = mix(rock_color_dark * 0.5, base * 1.3, height_ratio);
 
+	// Snow on peaks — noisy edge for natural look
+	float snow_noise = fbm(uv * rock_noise_scale * 2.0 + vec2(5.0, 3.0)) * 0.15;
+	float snow_blend = smoothstep(snow_line - 0.05, snow_line + 0.1, height_ratio + snow_noise);
+	base = mix(base, snow_color, snow_blend);
+
 	ALBEDO = base;
-	ROUGHNESS = 0.9;
+	ROUGHNESS = mix(0.9, 0.7, snow_blend);
 }

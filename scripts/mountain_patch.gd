@@ -17,7 +17,7 @@ func _build() -> void:
 	plane.subdivide_depth = 24
 	mesh = plane
 
-	# Per-instance material to set neighbors uniform
+	# Per-instance material — only neighbors differ per tile
 	var mat := shared_material.duplicate() as ShaderMaterial
 	mat.set_shader_parameter("neighbors", neighbors)
 	material_override = mat
