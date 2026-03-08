@@ -260,11 +260,12 @@ func _spawn_mountains(grid: Array, legend: Dictionary) -> void:
 	if mountain_positions.is_empty():
 		return
 
-	# Create height map texture: each mountain tile stores peak_height / 3.0
-	# Shared across all tiles — shader samples by world position, so adjacent
-	# tiles get the same value at their shared edge = no seam
-	var img := Image.create(_grid_cols, _grid_rows, false, Image.FORMAT_R8)
+	var mountain_script := load("res://scripts/mountain_patch.gd")
+	var mountain_mat := _create_mountain_material()
+	var ring_mat := _create_mountain_ring_material()
+
 	for pos in mountain_positions:
+		# Count 8-directional neighbors for height scaling
 		var nb_count := 0
 		for dy in range(-1, 2):
 			for dx in range(-1, 2):
@@ -273,36 +274,28 @@ func _spawn_mountains(grid: Array, legend: Dictionary) -> void:
 				if mountain_positions.has(Vector2i(pos.x + dx, pos.y + dy)):
 					nb_count += 1
 		var peak := 1.0 + nb_count * 0.2
-		img.set_pixel(pos.x, pos.y, Color(peak / 3.0, 0, 0, 1))
 
-	var height_tex := ImageTexture.create_from_image(img)
+		# 8-directional neighbors matching vertex order: SE, S, SW, W, NW, N, NE, E
+		var nb8 := [
+			1.0 if mountain_positions.has(Vector2i(pos.x + 1, pos.y + 1)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(pos.x, pos.y + 1)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(pos.x - 1, pos.y + 1)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(pos.x - 1, pos.y)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(pos.x - 1, pos.y - 1)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(pos.x, pos.y - 1)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(pos.x + 1, pos.y - 1)) else 0.0,
+			1.0 if mountain_positions.has(Vector2i(pos.x + 1, pos.y)) else 0.0,
+		]
 
-	var mountain_script := load("res://scripts/mountain_patch.gd")
-	var mountain_mat := _create_mountain_material()
-	mountain_mat.set_shader_parameter("height_map", height_tex)
-	mountain_mat.set_shader_parameter("grid_size", Vector2(_grid_cols, _grid_rows))
-	mountain_mat.set_shader_parameter("ground_size_world", ground_size)
-	var ring_mat := _create_mountain_ring_material()
-
-	for pos in mountain_positions:
-		var col_idx: int = pos.x
-		var row_idx: int = pos.y
-		# Cardinal neighbors for edge clamping (keeps pyramid shape at borders)
-		var nb := Vector4(
-			1.0 if mountain_positions.has(Vector2i(col_idx + 1, row_idx)) else 0.0,
-			1.0 if mountain_positions.has(Vector2i(col_idx - 1, row_idx)) else 0.0,
-			1.0 if mountain_positions.has(Vector2i(col_idx, row_idx + 1)) else 0.0,
-			1.0 if mountain_positions.has(Vector2i(col_idx, row_idx - 1)) else 0.0,
-		)
-
-		var world_pos := grid_to_world(col_idx, row_idx)
+		var world_pos := grid_to_world(pos.x, pos.y)
 
 		var patch := MeshInstance3D.new()
 		patch.set_script(mountain_script)
 		patch.patch_size = Vector2(_cell_size, _cell_size)
+		patch.peak_height = peak
 		patch.shared_material = mountain_mat
 		patch.ring_material = ring_mat
-		patch.neighbors = nb
+		patch.neighbors_8 = nb8
 		patch.transform.origin = world_pos
 		_nav_region.add_child(patch)
 
